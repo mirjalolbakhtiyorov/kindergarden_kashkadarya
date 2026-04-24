@@ -1,0 +1,13 @@
+import { z } from 'zod';
+
+export const staffFormSchema = z.object({
+  full_name: z.string().min(2, "F.I.Sh kiritilishi shart"),
+  position: z.string().min(2, "Lavozim kiritilishi shart"),
+  phone: z.string().min(7, "Telefon raqami kiritilishi shart"),
+  email: z.string().email("Noto'g'ri email format").optional().or(z.literal('')),
+  passport_no: z.string().min(1, "Passport ma'lumotlari kiritilishi shart"),
+  group_id: z.string().optional().or(z.literal('')),
+  status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
+});
+
+export type StaffFormValues = z.infer<typeof staffFormSchema>;
