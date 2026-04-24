@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { groupsApi } from '../api/groupsApi';
 import { Group } from '../types/group.types';
 import { GroupFormValues } from '../schemas/groupForm.schema';
+import { useNotification } from '../../../context/NotificationContext';
 
 export const useGroups = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showNotification } = useNotification();
 
   const fetchGroups = useCallback(async () => {
     try {
@@ -26,8 +28,9 @@ export const useGroups = () => {
       setLoading(true);
       await groupsApi.create(data);
       await fetchGroups();
+      showNotification('Guruh muvaffaqiyatli yaratildi!', 'success');
     } catch (err: any) {
-      alert('Xatolik: ' + (err.response?.data?.error || err.message));
+      showNotification('Xatolik: ' + (err.response?.data?.error || err.message), 'error');
       throw err;
     } finally {
       setLoading(false);
@@ -39,8 +42,9 @@ export const useGroups = () => {
       setLoading(true);
       await groupsApi.update(id, data);
       await fetchGroups();
+      showNotification('Guruh muvaffaqiyatli yangilandi!', 'success');
     } catch (err: any) {
-      alert('Xatolik: ' + (err.response?.data?.error || err.message));
+      showNotification('Xatolik: ' + (err.response?.data?.error || err.message), 'error');
       throw err;
     } finally {
       setLoading(false);
@@ -48,22 +52,21 @@ export const useGroups = () => {
   };
 
   const deleteGroup = async (id: string) => {
-    if (window.confirm('Haqiqatdan ham ushbu guruhni o\'chirmoqchimisiz?')) {
-      try {
-        setLoading(true);
-        await groupsApi.delete(id);
-        await fetchGroups();
-        setError(null);
-      } catch (err: any) {
-        const msg = err.response?.data?.error || err.message || 'O‘chirishda xatolik';
-        if (msg.includes('FOREIGN KEY constraint failed')) {
-          alert('Ushbu guruhni o‘chirib bo‘lmaydi, chunki unda bolalar yoki xodimlar mavjud.');
-        } else {
-          alert('Xatolik: ' + msg);
-        }
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      await groupsApi.delete(id);
+      await fetchGroups();
+      showNotification('Guruh o\'chirildi!', 'success');
+      setError(null);
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || 'O‘chirishda xatolik';
+      if (msg.includes('FOREIGN KEY constraint failed')) {
+        showNotification('Ushbu guruhni o‘chirib bo‘lmaydi, chunki unda bolalar yoki xodimlar mavjud.', 'error');
+      } else {
+        showNotification('Xatolik: ' + msg, 'error');
       }
+    } finally {
+      setLoading(false);
     }
   };
 

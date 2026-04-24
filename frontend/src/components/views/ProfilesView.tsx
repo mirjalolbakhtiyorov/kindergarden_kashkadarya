@@ -35,10 +35,10 @@ const ProfilesView: React.FC = () => {
 
   const filteredParents = parents.filter(p => {
     const matchesSearch = 
-      p.childName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.childName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.fatherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.motherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.login.toLowerCase().includes(searchTerm.toLowerCase());
+      p.login?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesGroup = selectedGroup === 'ALL' || p.childGroup === selectedGroup;
     
@@ -84,13 +84,11 @@ const ProfilesView: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Haqiqatan ham ushbu profilni o‘chirmoqchimisiz?')) {
-      try {
-        await deleteParent(id);
-        showNotification('Profil o‘chirib tashlandi', 'success');
-      } catch (error) {
-        showNotification('Xatolik yuz berdi', 'error');
-      }
+    try {
+      await deleteParent(id);
+      showNotification('Profil o‘chirib tashlandi', 'success');
+    } catch (error) {
+      showNotification('Xatolik yuz berdi', 'error');
     }
   };
 
@@ -296,7 +294,7 @@ const ProfilesView: React.FC = () => {
                       Profilni tahrirlash
                     </h3>
                     <p className="text-brand-muted text-[10px] font-black uppercase tracking-widest mt-1">
-                      {`${parent.childName}`}
+                      {`${editingParent.childName}`}
                     </p>
                   </div>
                   <button 

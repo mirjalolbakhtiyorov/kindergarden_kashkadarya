@@ -12,9 +12,7 @@ export const StaffTable: React.FC<Props> = ({ onEdit }) => {
   if (loading) return <div className="p-8 text-center text-brand-muted font-bold">Yuklanmoqda...</div>;
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Haqiqatdan ham ushbu xodimni o\'chirmoqchimisiz?')) {
-      await deleteStaff(id);
-    }
+    await deleteStaff(id);
   };
 
   return (

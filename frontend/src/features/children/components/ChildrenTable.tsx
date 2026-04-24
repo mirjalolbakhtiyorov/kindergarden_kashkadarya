@@ -12,9 +12,7 @@ export const ChildrenTable: React.FC<Props> = ({ onEdit }) => {
   if (loading) return <div className="p-8 text-center text-brand-muted font-bold">Yuklanmoqda...</div>;
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Haqiqatdan ham ushbu ma\'lumotni o\'chirmoqchimisiz?')) {
-      await deleteChild(id);
-    }
+    await deleteChild(id);
   };
 
   return (

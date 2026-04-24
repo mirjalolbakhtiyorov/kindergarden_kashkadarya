@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { staffFormSchema, StaffFormValues } from '../schemas/staffForm.schema';
-import { UserCircle, Smartphone, ArrowRight, FileText } from 'lucide-react';
+import { UserCircle, Smartphone, ArrowRight, FileText, GraduationCap, Briefcase, Calendar, Upload } from 'lucide-react';
 import { useStaff } from '../hooks/useStaff';
 import { useGroups } from '../../groups/hooks/useGroups';
 import { useNotification } from '../../../context/NotificationContext';
@@ -25,16 +25,13 @@ export const StaffFormModal: React.FC<Props> = ({ staffMember, onClose }) => {
       phone: staffMember.phone,
       email: staffMember.email || '',
       passport_no: staffMember.passport_no,
+      birth_date: staffMember.birth_date || '',
+      education: staffMember.education || '',
+      experience_years: staffMember.experience_years?.toString() || '',
       group_id: staffMember.group_id || '',
       status: staffMember.status
     } : { status: 'ACTIVE', group_id: '' }
   });
-
-  const handlePassportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.value.length >= 7) {
-      showNotification('Ma\'lumotlaringiz yuklandi', 'success');
-    }
-  };
 
   const onSubmit = async (data: StaffFormValues) => {
     try {
@@ -62,6 +59,7 @@ export const StaffFormModal: React.FC<Props> = ({ staffMember, onClose }) => {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+        {/* Shaxsiy ma'lumotlar */}
         <div className="space-y-6">
           <div className="flex items-center gap-2 text-brand-primary border-b border-brand-primary/10 pb-2">
             <UserCircle size={18} />
@@ -79,20 +77,84 @@ export const StaffFormModal: React.FC<Props> = ({ staffMember, onClose }) => {
               {errors.position && <p className="text-red-500 text-xs">{errors.position.message}</p>}
             </div>
             <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Tug'ilgan sana *</label>
+              <div className="relative">
+                <input type="date" {...register('birth_date')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 focus:ring-2 focus:ring-brand-primary/10 outline-none" />
+                <Calendar className="absolute right-4 top-3 text-brand-slate" size={18} />
+              </div>
+              {errors.birth_date && <p className="text-red-500 text-xs">{errors.birth_date.message}</p>}
+            </div>
+            <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Passport ma'lumotlari *</label>
               <div className="relative">
                 <input 
                   {...register('passport_no')} 
-                  onChange={(e) => {
-                    register('passport_no').onChange(e);
-                    handlePassportChange(e);
-                  }}
                   className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 focus:ring-2 focus:ring-brand-primary/10 outline-none" 
                   placeholder="AA1234567"
                 />
                 <FileText className="absolute right-4 top-3.5 text-brand-slate" size={18} />
               </div>
               {errors.passport_no && <p className="text-red-500 text-xs">{errors.passport_no.message}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Passport PDF yuklash</label>
+              <div className="relative">
+                <input 
+                  type="file"
+                  accept=".pdf"
+                  {...register('passport_pdf')}
+                  className="hidden"
+                  id="passport-upload"
+                />
+                <label 
+                  htmlFor="passport-upload"
+                  className="w-full bg-slate-50 border-2 border-dashed border-brand-border rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 cursor-pointer hover:bg-brand-primary/5 hover:border-brand-primary transition-all text-sm font-bold text-brand-slate"
+                >
+                  <Upload size={16} /> PDF Faylni tanlang
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Ta'lim va Tajriba */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 text-brand-primary border-b border-brand-primary/10 pb-2">
+            <GraduationCap size={18} />
+            <h4 className="font-bold text-sm uppercase tracking-wider">Ta'lim va Ish tajribasi</h4>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Qayerda o'qigan (Oliy/O'rta maxsus) *</label>
+              <div className="relative">
+                <input {...register('education')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 focus:ring-2 focus:ring-brand-primary/10 outline-none" placeholder="Masalan: Qarshi Davlat Universiteti" />
+                <GraduationCap className="absolute right-4 top-3.5 text-brand-slate" size={18} />
+              </div>
+              {errors.education && <p className="text-red-500 text-xs">{errors.education.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Ish staji (yil) *</label>
+              <div className="relative">
+                <input type="number" {...register('experience_years')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 focus:ring-2 focus:ring-brand-primary/10 outline-none" placeholder="5" />
+                <Briefcase className="absolute right-4 top-3.5 text-brand-slate" size={18} />
+              </div>
+              {errors.experience_years && <p className="text-red-500 text-xs">{errors.experience_years.message}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Aloqa va Guruh */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 text-brand-primary border-b border-brand-primary/10 pb-2">
+            <Smartphone size={18} />
+            <h4 className="font-bold text-sm uppercase tracking-wider">Aloqa va Biriktirish</h4>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Telefon raqami *</label>
+              <input {...register('phone')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 outline-none" placeholder="+998 90 123 45 67" />
+              {errors.phone && <p className="text-red-500 text-xs">{errors.phone.message}</p>}
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Guruhi</label>
@@ -102,25 +164,6 @@ export const StaffFormModal: React.FC<Props> = ({ staffMember, onClose }) => {
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 text-brand-primary border-b border-brand-primary/10 pb-2">
-            <Smartphone size={18} />
-            <h4 className="font-bold text-sm uppercase tracking-wider">Aloqa ma'lumotlari</h4>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Telefon raqami *</label>
-              <input {...register('phone')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 outline-none" placeholder="+998 90 123 45 67" />
-              {errors.phone && <p className="text-red-500 text-xs">{errors.phone.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Email (ixtiyoriy)</label>
-              <input {...register('email')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 outline-none" placeholder="example@mail.com" />
-              {errors.email && <p className="text-red-500 text-xs">{errors.email.message}</p>}
             </div>
           </div>
         </div>

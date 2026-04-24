@@ -5,7 +5,7 @@ export const childFormSchema = z.object({
   last_name: z.string().min(2, "Otasining ismi kiritilishi shart"),
   birth_date: z.string().min(1, "Tug'ilgan sana kiritilishi shart"),
   age_category: z.string().min(1, "Yosh kategoriyasi kiritilishi shart"),
-  gender: z.enum(["M", "F"], { required_error: "Jinsi tanlanishi shart" }),
+  gender: z.enum(["M", "F"], { errorMap: () => ({ message: "Jinsi tanlanishi shart" }) }),
   address: z.string().min(1, "Manzil kiritilishi shart"),
   weight: z.string().optional(),
   height: z.string().optional(),
@@ -22,7 +22,7 @@ export const childFormSchema = z.object({
   mother_phone: z.string().min(7, "Telefon raqami kiritilishi shart"),
   mother_passport: z.string().optional(),
   group_id: z.string().min(1, "Guruh tanlanishi shart"),
-  status: z.enum(["DRAFT", "PENDING", "ACTIVE"]).default("DRAFT"),
+  status: z.enum(["DRAFT", "PENDING", "ACTIVE"]).optional(),
 });
 
 export type ChildFormValues = z.infer<typeof childFormSchema>;

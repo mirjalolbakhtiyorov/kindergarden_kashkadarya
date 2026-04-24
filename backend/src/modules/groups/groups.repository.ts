@@ -5,9 +5,23 @@ import { OperationsRepository } from '../operations/operations.repository';
 export class GroupsRepository {
   async findAll(): Promise<any[]> {
     return new Promise((resolve, reject) => {
-      db.all("SELECT * FROM groups", [], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
+      db.all("SELECT * FROM groups", [], async (err, groups: any[]) => {
+        if (err) return reject(err);
+        
+        try {
+          const groupsWithChildren = await Promise.all(groups.map(async (group) => {
+            const children = await new Promise((res, rej) => {
+              db.all("SELECT id, first_name, last_name, gender, status FROM children WHERE group_id = ?", [group.id], (err, rows) => {
+                if (err) rej(err);
+                else res(rows);
+              });
+            });
+            return { ...group, children };
+          }));
+          resolve(groupsWithChildren);
+        } catch (error) {
+          reject(error);
+        }
       });
     });
   }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -55,68 +55,26 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 
+const API_BASE = 'http://localhost:3001/api';
+
 type SettingsTab = 'profile' | 'security' | 'menu' | 'medical' | 'messages' | 'finance' | 'attendance' | 'documents' | 'pickup' | 'progress' | 'vaccines';
 
-// --- RICH MOCK DATA FOR PREMIUM FEEL ---
-const MOCK_PARENT_DATA = {
-  id: "test-child-id",
-  childName: "Mustafo Bozorov",
-  childBirthCertificate: "GC-7788990-UZ",
-  address: "Toshkent shahar, Chilonzor tumani, 5-mavze, 12-uy, 45-xonadon",
-  childGroup: "3-guruh 'Bilimdonlar'",
-  fatherName: "Bozorov Iskandar",
-  fatherPhone: "+998 90 123 45 67",
-  fatherWorkplace: "IT Park Academy (Senior Developer)",
-  fatherPassport: "AA 1234567",
-  motherName: "Bozorova Nigora",
-  motherPhone: "+998 93 777 88 99",
-  motherWorkplace: "Toshkent Tibbiyot Akademiyasi (Shifokor)",
-  motherPassport: "AB 7654321",
-  height: 118,
-  weight: 19.5,
-  allergies: "Asal, yong'oq va qulupnay",
-  medical_notes: "Bolada jiddiy tibbiy cheklovlar yo'q. Oylik profilaktik ko'riklardan o'tgan. Vitamin D qabul qiladi."
+const MEAL_LABELS: Record<string, string> = {
+  'BREAKFAST': 'Nonushta',
+  'LUNCH': 'Tushlik',
+  'TEA': 'Poldnik',
+  'DINNER': 'Kechki ovqat'
 };
 
-const MOCK_FULL_DATA = {
-  payments: [
-    { id: "PAY-9921", date: "2026-04-05", amount: 500000, status: "PAID" },
-    { id: "PAY-8812", date: "2026-03-05", amount: 450000, status: "PAID" },
-    { id: "PAY-7734", date: "2026-02-05", amount: 450000, status: "PAID" },
-    { id: "PAY-6655", date: "2026-01-05", amount: 450000, status: "PAID" }
-  ],
-  attendance: [
-    { id: "tomorrow", date: "2026-04-25", status: "PLANNED", isAttending: true, reason: null },
-    { id: "1", date: "2026-04-24", status: "PRESENT", reason: null },
-    { id: "2", date: "2026-04-23", status: "PRESENT", reason: null },
-    { id: "3", date: "2026-04-22", status: "ABSENT_SICK", reason: "Shamollash alomatlari (Yengil)" },
-    { id: "4", date: "2026-04-21", status: "PRESENT", reason: null },
-    { id: "5", date: "2026-04-20", status: "PRESENT", reason: null },
-    { id: "6", date: "2026-04-17", status: "PRESENT", reason: null },
-    { id: "7", date: "2026-04-16", status: "PRESENT", reason: null }
-  ],
-  progressReports: [
-    { id: "r1", date: "2026-04-22", subject: "Rasm chizish", rating: 5, comment: "Mustafo bugun 'Mening Oilam' mavzusida juda chiroyli rasm chizdi. Ranglar uyg'unligi va kompozitsiya a'lo darajada." },
-    { id: "r2", date: "2026-04-20", subject: "Ingliz tili", rating: 4, comment: "Yangi so'zlarni (hayvonlar nomlari) oson o'zlashtirdi. Talaffuz ustida biroz ishlashimiz kerak." },
-    { id: "r3", date: "2026-04-18", subject: "Mantiqiy fikrlash", rating: 5, comment: "Matematik boshqotirmalarni guruhda birinchi bo'lib yechdi. Diqqati juda yuqori." }
-  ],
-  vaccinations: [
-    { id: "v1", vaccine_name: "VGB (Gepatit B)", planned_date: "2025-10-10", taken_date: "2025-10-12", status: "TAKEN" },
-    { id: "v2", vaccine_name: "OPV (Polio)", planned_date: "2026-05-20", taken_date: null, status: "PLANNED" },
-    { id: "v3", vaccine_name: "AKDS", planned_date: "2026-02-15", taken_date: "2026-02-15", status: "TAKEN" }
-  ],
-  documents: [
-    { id: "d1", title: "Tug'ilganlik haqida guvohnoma", created_at: "2026-01-10" },
-    { id: "d2", title: "Tibbiy karta (086)", created_at: "2026-01-12" },
-    { id: "d3", title: "Vaksinatsiya pasporti", created_at: "2026-01-15" }
-  ],
-  authorizedPickups: [
-    { id: "p1", full_name: "Bozorov Ahmad", relation: "Bobosi", phone: "+998 90 999 00 11", photo_url: null },
-    { id: "p2", full_name: "Bozorova Ra'no", relation: "Buvisi", phone: "+998 90 888 11 22", photo_url: null }
-  ]
+const MEAL_TIMES: Record<string, string> = {
+  'BREAKFAST': '08:30',
+  'LUNCH': '12:30',
+  'TEA': '16:00',
+  'DINNER': '18:30'
 };
 
 const ParentView = () => {
@@ -125,13 +83,37 @@ const ParentView = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [isSaving, setIsSaving] = useState(false);
   
-  // Using MOCK DATA by default
-  const [parentData] = useState<any>(MOCK_PARENT_DATA);
-  const [fullPortalData] = useState<any>(MOCK_FULL_DATA);
-  const [loading] = useState(false);
+  const [parentData, setParentData] = useState<any>(null);
+  const [fullPortalData, setFullPortalData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.childId) {
+      fetchPortalData(user.childId);
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
+
+  const fetchPortalData = async (childId: string) => {
+    setLoading(true);
+    try {
+      const [infoRes, fullRes] = await Promise.all([
+        axios.get(`${API_BASE}/parent-portal/child-info/${childId}`),
+        axios.get(`${API_BASE}/parent-portal/full-data/${childId}`)
+      ]);
+      setParentData(infoRes.data);
+      setFullPortalData(fullRes.data);
+    } catch (err) {
+      console.error(err);
+      showNotification("Ma'lumotlarni yuklashda xatolik", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [credentials, setCredentials] = useState({
-    login: user?.login || 'mustafo_2026',
+    login: user?.login || '',
     newPassword: '',
     confirmPassword: ''
   });
@@ -149,6 +131,34 @@ const ParentView = () => {
       { id: 2, type: 'sent', text: 'Tushunarli, rahmat. Tadbir soat nechada boshlanadi?', time: '09:45', status: 'read' }
     ]
   });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-brand-depth font-black uppercase tracking-widest text-xs">Ma'lumotlar yuklanmoqda...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user?.childId || !parentData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-8 text-center space-y-6">
+        <div className="w-24 h-24 bg-rose-50 text-rose-500 rounded-[2.5rem] flex items-center justify-center border-2 border-rose-100 shadow-xl">
+           <ShieldAlert size={48} />
+        </div>
+        <div className="space-y-2">
+           <h2 className="text-3xl font-black text-brand-depth">Hisob bog'lanmagan</h2>
+           <p className="text-brand-muted font-bold max-w-md mx-auto">Ushbu ota-ona hisobi hali biron bir bola ma'lumotlariga bog'lanmagan. Iltimos, bog'cha ma'muriyati bilan bog'laning.</p>
+        </div>
+        <button onClick={logout} className="px-10 py-5 bg-brand-depth text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-brand-primary transition-all flex items-center gap-3">
+           <LogOut size={18} /> Tizimdan chiqish
+        </button>
+      </div>
+    );
+  }
 
   const handleSendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -171,13 +181,24 @@ const ParentView = () => {
     showNotification('Xabar yuborildi', 'success');
   };
 
-  const handleUpdateCredentials = (e: React.FormEvent) => {
+  const handleUpdateCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (credentials.newPassword !== credentials.confirmPassword) {
+      showNotification("Parollar mos kelmadi", "error");
+      return;
+    }
     setIsSaving(true);
-    setTimeout(() => {
+    try {
+      await axios.put(`${API_BASE}/parents/${user?.id}`, {
+        login: credentials.login,
+        password: credentials.newPassword
+      });
       showNotification('Ma’lumotlar muvaffaqiyatli yangilandi!', 'success');
+    } catch (err) {
+      showNotification("Xatolik yuz berdi", "error");
+    } finally {
       setIsSaving(false);
-    }, 1000);
+    }
   };
 
   const navItems: { id: SettingsTab; label: string; icon: any; color: string }[] = [
@@ -210,12 +231,12 @@ const ParentView = () => {
                      <div className="bg-white p-7 rounded-[2.5rem] border border-brand-border shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity"><User size={60} /></div>
                         <p className="text-[10px] font-black text-brand-muted uppercase tracking-widest mb-1">To'liq ismi va familiyasi</p>
-                        <p className="text-base font-black text-brand-depth relative z-10">{parentData.childName}</p>
+                        <p className="text-base font-black text-brand-depth relative z-10">{parentData.first_name} {parentData.last_name}</p>
                      </div>
                      <div className="bg-white p-7 rounded-[2.5rem] border border-brand-border shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity"><Target size={60} /></div>
                         <p className="text-[10px] font-black text-brand-muted uppercase tracking-widest mb-1">Tug'ilganlik guvohnomasi</p>
-                        <p className="text-base font-black text-brand-depth relative z-10">{parentData.childBirthCertificate}</p>
+                        <p className="text-base font-black text-brand-depth relative z-10">{parentData.birth_certificate_number}</p>
                      </div>
                      <div className="bg-white p-7 rounded-[2.5rem] border border-brand-border shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity"><MapPin size={60} /></div>
@@ -238,30 +259,30 @@ const ParentView = () => {
                      <div className="bg-white p-8 rounded-[3rem] border border-brand-border shadow-sm space-y-6 relative overflow-hidden group hover:shadow-2xl transition-all">
                         <div className="absolute top-0 left-0 w-2 h-full bg-brand-primary"></div>
                         <p className="text-[10px] font-black text-brand-primary uppercase tracking-[0.2em]">Otasining ma'lumotlari</p>
-                        <h5 className="text-2xl font-black text-brand-depth tracking-tight">{parentData.fatherName}</h5>
+                        <h5 className="text-2xl font-black text-brand-depth tracking-tight">{parentData.fatherName || 'Ma\'lumot kiritilmagan'}</h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
                               <Briefcase size={16} className="text-brand-muted" />
-                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Ishlash joyi</p><p className="text-xs font-bold text-brand-depth">{parentData.fatherWorkplace}</p></div>
+                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Ishlash joyi</p><p className="text-xs font-bold text-brand-depth">{parentData.fatherWorkplace || 'Noma\'lum'}</p></div>
                            </div>
                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
                               <Smartphone size={16} className="text-brand-muted" />
-                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Telefon</p><p className="text-xs font-bold text-brand-depth">{parentData.fatherPhone}</p></div>
+                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Telefon</p><p className="text-xs font-bold text-brand-depth">{parentData.fatherPhone || 'Noma\'lum'}</p></div>
                            </div>
                         </div>
                      </div>
                      <div className="bg-white p-8 rounded-[3rem] border border-brand-border shadow-sm space-y-6 relative overflow-hidden group hover:shadow-2xl transition-all">
                         <div className="absolute top-0 left-0 w-2 h-full bg-rose-500"></div>
                         <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em]">Onasining ma'lumotlari</p>
-                        <h5 className="text-2xl font-black text-brand-depth tracking-tight">{parentData.motherName}</h5>
+                        <h5 className="text-2xl font-black text-brand-depth tracking-tight">{parentData.motherName || 'Ma\'lumot kiritilmagan'}</h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
                               <Briefcase size={16} className="text-brand-muted" />
-                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Ishlash joyi</p><p className="text-xs font-bold text-brand-depth">{parentData.motherWorkplace}</p></div>
+                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Ishlash joyi</p><p className="text-xs font-bold text-brand-depth">{parentData.motherWorkplace || 'Noma\'lum'}</p></div>
                            </div>
                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
                               <Smartphone size={16} className="text-brand-muted" />
-                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Telefon</p><p className="text-xs font-bold text-brand-depth">{parentData.motherPhone}</p></div>
+                              <div><p className="text-[8px] font-black text-brand-muted uppercase">Telefon</p><p className="text-xs font-bold text-brand-depth">{parentData.motherPhone || 'Noma\'lum'}</p></div>
                            </div>
                         </div>
                      </div>
@@ -286,7 +307,7 @@ const ParentView = () => {
                         <div className="w-20 h-20 rounded-[2.5rem] flex items-center justify-center backdrop-blur-xl border-2 bg-emerald-500/20 border-emerald-500/30 text-emerald-400"><CheckCircle2 size={36} /></div>
                      </div>
                      <div className="grid grid-cols-2 md:grid-cols-3 gap-8 pt-8 border-t border-white/5">
-                        <div><p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Umumiy to'lovlar</p><p className="text-xl font-black">1,850,000 UZS</p></div>
+                        <div><p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Umumiy to'lovlar</p><p className="text-xl font-black">{data.payments.reduce((sum: number, p: any) => sum + p.amount, 0).toLocaleString()} UZS</p></div>
                         <div><p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Joriy qarz</p><p className="text-xl font-black text-emerald-400">0 UZS</p></div>
                         <div className="hidden md:block"><p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Keyingi hisob</p><p className="text-xl font-black">1-may, 2026</p></div>
                      </div>
@@ -315,10 +336,10 @@ const ParentView = () => {
                      <tbody className="divide-y divide-slate-50">
                         {data.payments.map((p: any) => (
                            <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
-                              <td className="px-10 py-8 font-mono text-[10px] font-black text-brand-primary">#{p.id}</td>
+                              <td className="px-10 py-8 font-mono text-[10px] font-black text-brand-primary">#{p.id.slice(0, 8)}</td>
                               <td className="px-10 py-8 text-sm font-black text-brand-depth">{p.date}</td>
                               <td className="px-10 py-8 text-lg font-black text-brand-depth tracking-tight">{p.amount.toLocaleString()} UZS</td>
-                              <td className="px-10 py-8"><span className="px-3 py-1 bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase rounded-lg">To'langan</span></td>
+                              <td className="px-10 py-8"><span className="px-3 py-1 bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase rounded-lg">{p.status === 'PAID' ? 'To\'langan' : p.status}</span></td>
                               <td className="px-10 py-8 text-right"><button className="p-4 bg-white text-brand-depth hover:bg-brand-primary hover:text-white rounded-2xl transition-all shadow-xl border border-brand-border"><Download size={20} /></button></td>
                            </tr>
                         ))}
@@ -337,24 +358,24 @@ const ParentView = () => {
                 <div><h4 className="text-4xl font-black text-emerald-900 tracking-tighter">Premium Parhez Menyu</h4><p className="text-emerald-700 text-sm font-bold uppercase tracking-[0.2em] leading-relaxed max-w-2xl">Professional dietologlar tomonidan bolaning fiziologik ehtiyojlaridan kelib chiqib shakllantirilgan. 100% tabiiy va yangi mahsulotlar.</p></div>
              </div>
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                {[
-                  { type: 'Nonushta', time: '08:30', meal: 'Sutli bo\'tqa va pishloqli non', iron: '2.8mg', carbs: '48g', vitamins: 'A, D, B12', cals: '340', recipe: "Tayyorlanishi: Yangi sut va sariyog' qo'shilgan holda bug'da pishiriladi." },
-                  { type: 'Tushlik', time: '12:30', meal: 'Mastava va Mo\'shxo\'rda', iron: '5.4mg', carbs: '65g', vitamins: 'C, E, K', cals: '580', recipe: "Tayyorlanishi: Mol go'shti va sabzavotlar bilan boyitilgan an'anaviy sho'rva." },
-                  { type: 'Ikkinchi tushlik', time: '16:00', meal: 'Mevali assorti va sharbat', iron: '1.5mg', carbs: '35g', vitamins: 'B6, C, A', cals: '230', recipe: "Tarkibi: Olma, banan va mavsumiy mevalar to'plami." },
-                  { type: 'Kechki ovqat', time: '18:30', meal: 'Bug\'da pishgan kotlet va guruch', iron: '4.9mg', carbs: '42g', vitamins: 'Zinc, Mg, B6', cals: '420', recipe: "Tayyorlanishi: Yog'siz go'shtdan parhez usulida bug'da tayyorlanadi." }
-                ].map((item, idx) => (
+                {data.menu.length > 0 ? data.menu.map((item: any, idx: number) => (
                   <div key={idx} className="bg-white border-2 border-slate-50 rounded-[4rem] p-12 shadow-2xl hover:border-brand-primary transition-all group">
-                     <div className="flex justify-between items-center mb-8"><span className="px-6 py-2 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-2xl">{item.type}</span><div className="flex items-center gap-2 text-brand-muted font-bold text-xs"><Clock size={16}/> {item.time}</div></div>
-                     <h5 className="text-3xl font-black text-brand-depth mb-4 leading-tight">{item.meal}</h5>
-                     <p className="text-xs font-bold text-brand-slate mb-8 bg-slate-50 p-4 rounded-xl border-l-4 border-emerald-400 italic">"{item.recipe}"</p>
+                     <div className="flex justify-between items-center mb-8"><span className="px-6 py-2 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-2xl">{MEAL_LABELS[item.meal_type] || item.meal_type}</span><div className="flex items-center gap-2 text-brand-muted font-bold text-xs"><Clock size={16}/> {MEAL_TIMES[item.meal_type] || '--:--'}</div></div>
+                     <h5 className="text-3xl font-black text-brand-depth mb-4 leading-tight">{item.meal_name}</h5>
+                     <p className="text-xs font-bold text-brand-slate mb-8 bg-slate-50 p-4 rounded-xl border-l-4 border-emerald-400 italic">Vitaminlar: {item.vitamins}</p>
                      <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-100">
-                        <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between group-hover:bg-white transition-colors border border-slate-100"><span className="text-[10px] font-black text-brand-muted uppercase">Temir</span><span className="text-sm font-black text-brand-depth">{item.iron}</span></div>
-                        <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between group-hover:bg-white transition-colors border border-slate-100"><span className="text-[10px] font-black text-brand-muted uppercase">Uglerod</span><span className="text-sm font-black text-brand-depth">{item.carbs}</span></div>
+                        <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between group-hover:bg-white transition-colors border border-slate-100"><span className="text-[10px] font-black text-brand-muted uppercase">Temir</span><span className="text-sm font-black text-brand-depth">{item.iron} mg</span></div>
+                        <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between group-hover:bg-white transition-colors border border-slate-100"><span className="text-[10px] font-black text-brand-muted uppercase">Uglerod</span><span className="text-sm font-black text-brand-depth">{item.carbohydrates} g</span></div>
                         <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between col-span-2 group-hover:bg-white transition-colors border border-slate-100"><span className="text-[10px] font-black text-brand-muted uppercase">Vitamin Kompleksi</span><span className="text-sm font-black text-brand-primary tracking-widest">{item.vitamins}</span></div>
-                        <div className="bg-brand-depth p-5 rounded-2xl flex items-center justify-between col-span-2 text-white shadow-2xl group-hover:bg-brand-primary"><span className="text-[11px] font-black uppercase opacity-60">Energiya Qiymati</span><span className="text-2xl font-black tracking-tighter">{item.cals} kkal</span></div>
+                        <div className="bg-brand-depth p-5 rounded-2xl flex items-center justify-between col-span-2 text-white shadow-2xl group-hover:bg-brand-primary"><span className="text-[11px] font-black uppercase opacity-60">Energiya Qiymati</span><span className="text-2xl font-black tracking-tighter">{item.calories} kkal</span></div>
                      </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="col-span-2 bg-white p-20 rounded-[4rem] border-2 border-dashed border-brand-border flex flex-col items-center justify-center text-center space-y-4">
+                    <Apple size={48} className="text-brand-muted" />
+                    <p className="text-brand-muted font-black uppercase tracking-widest text-xs">Bugun uchun menyu hali belgilanmagan</p>
+                  </div>
+                )}
              </div>
           </motion.div>
         );
@@ -365,23 +386,23 @@ const ParentView = () => {
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-white p-10 rounded-[3rem] border border-brand-border shadow-xl flex items-center gap-10 relative overflow-hidden group hover:border-brand-primary transition-all">
                    <div className="w-20 h-20 rounded-[2rem] bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-sm shrink-0"><Activity size={32} /></div>
-                   <div><p className="text-[10px] font-black text-brand-muted uppercase tracking-widest mb-1">Bo'yi (O'sish)</p><h4 className="text-5xl font-black text-blue-700 tracking-tighter">{parentData.height} <span className="text-xl font-bold opacity-60">cm</span></h4></div>
+                   <div><p className="text-[10px] font-black text-brand-muted uppercase tracking-widest mb-1">Bo'yi (O'sish)</p><h4 className="text-5xl font-black text-blue-700 tracking-tighter">{parentData.height || '--'} <span className="text-xl font-bold opacity-60">cm</span></h4></div>
                 </div>
                 <div className="bg-white p-10 rounded-[3rem] border border-brand-border shadow-xl flex items-center gap-10 relative overflow-hidden group hover:border-rose-500 transition-all">
                    <div className="w-20 h-20 rounded-[2rem] bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shadow-sm shrink-0"><Heart size={32} /></div>
-                   <div><p className="text-[10px] font-black text-brand-muted uppercase tracking-widest mb-1">Vazni (Og'irligi)</p><h4 className="text-5xl font-black text-rose-700 tracking-tighter">{parentData.weight} <span className="text-xl font-bold opacity-60">kg</span></h4></div>
+                   <div><p className="text-[10px] font-black text-brand-muted uppercase tracking-widest mb-1">Vazni (Og'irligi)</p><h4 className="text-5xl font-black text-rose-700 tracking-tighter">{parentData.weight || '--'} <span className="text-xl font-bold opacity-60">kg</span></h4></div>
                 </div>
              </div>
              <div className="bg-amber-50 p-12 rounded-[4rem] border-2 border-amber-100 relative overflow-hidden shadow-xl group">
                 <div className="absolute top-0 right-0 p-10 opacity-10"><ShieldAlert size={100} className="text-amber-600" /></div>
                 <div className="relative z-10 space-y-6">
                    <div className="flex items-center gap-4"><ShieldAlert size={24} className="text-amber-500" /><h5 className="text-2xl font-black text-amber-950 tracking-tight">Allergiyalar va Taqiqlar</h5></div>
-                   <div className="bg-white/80 backdrop-blur-md p-8 rounded-[2.5rem] border border-amber-200 shadow-inner"><p className="text-lg font-black text-amber-900 leading-relaxed uppercase tracking-tight">{parentData.allergies}</p></div>
+                   <div className="bg-white/80 backdrop-blur-md p-8 rounded-[2.5rem] border border-amber-200 shadow-inner"><p className="text-lg font-black text-amber-900 leading-relaxed uppercase tracking-tight">{parentData.allergies || 'Taqiqlar mavjud emas'}</p></div>
                 </div>
              </div>
              <div className="bg-white p-12 rounded-[4rem] border border-brand-border shadow-sm group">
                 <h5 className="font-black text-xs uppercase tracking-[0.3em] text-brand-depth mb-6 flex items-center gap-3"><FileText size={18} className="text-brand-primary" /> Shifokor tavsiyalari va tibbiy qaydlar</h5>
-                <div className="bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-100 group-hover:bg-white transition-all"><p className="text-base font-bold text-brand-slate leading-loose italic">{parentData.medical_notes}</p></div>
+                <div className="bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-100 group-hover:bg-white transition-all"><p className="text-base font-bold text-brand-slate leading-loose italic">{parentData.medical_notes || 'Qaydlar mavjud emas'}</p></div>
              </div>
           </motion.div>
         );
@@ -398,7 +419,7 @@ const ParentView = () => {
              </div>
              <div className="bg-white rounded-[4rem] border border-brand-border overflow-hidden shadow-2xl relative">
                 <div className="divide-y divide-slate-100">
-                   {data.vaccinations.map((v:any) => (
+                   {data.vaccinations.length > 0 ? data.vaccinations.map((v:any) => (
                       <div key={v.id} className="p-12 flex flex-col sm:flex-row items-center justify-between group hover:bg-sky-50/30 transition-all gap-8">
                          <div className="flex items-center gap-10">
                             <div className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center border-4 transition-all shadow-xl ${v.status === 'TAKEN' ? 'bg-emerald-50 border-white text-emerald-500' : 'bg-slate-50 border-white text-slate-300 group-hover:bg-white'}`}><Syringe size={36} /></div>
@@ -406,7 +427,9 @@ const ParentView = () => {
                          </div>
                          <div className={`px-10 py-5 rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl transition-all border-b-4 ${v.status === 'TAKEN' ? 'bg-emerald-500 text-white border-emerald-700 shadow-emerald-500/20' : 'bg-brand-depth text-white border-black shadow-brand-depth/20'}`}>{v.status === 'TAKEN' ? 'Muvaffaqiyatli' : 'Kutilmoqda'}</div>
                       </div>
-                   ))}
+                   )) : (
+                    <div className="p-20 text-center text-brand-muted font-black uppercase tracking-widest text-xs">Emlash ma'lumotlari mavjud emas</div>
+                   )}
                 </div>
              </div>
           </motion.div>
@@ -420,7 +443,7 @@ const ParentView = () => {
                 <div className="relative z-10 flex items-center gap-8 bg-white/10 p-10 rounded-[4rem] border border-white/20 backdrop-blur-2xl"><div className="w-24 h-24 rounded-[2rem] bg-white text-amber-500 flex items-center justify-center shadow-xl"><Award size={48} /></div><div className="text-center"><p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-60">Umumiy Reyting</p><p className="text-7xl font-black tracking-tighter mt-1">4.9</p></div></div>
              </div>
              <div className="grid grid-cols-1 gap-10">
-                {data.progressReports.map((r:any) => (
+                {data.progressReports.length > 0 ? data.progressReports.map((r:any) => (
                    <div key={r.id} className="bg-white p-12 rounded-[4rem] border border-brand-border shadow-xl relative overflow-hidden group hover:shadow-2xl transition-all">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-10 mb-8">
                          <div className="flex items-center gap-6"><div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center shadow-sm"><Star size={32} /></div><div><h5 className="text-3xl font-black text-brand-depth tracking-tighter leading-none">{r.subject}</h5><p className="text-[11px] font-black text-brand-muted uppercase tracking-[0.3em] mt-2">{r.date} • TARBIYACHI HISOBOTI</p></div></div>
@@ -428,7 +451,9 @@ const ParentView = () => {
                       </div>
                       <div className="bg-brand-ghost p-10 rounded-[3rem] border-2 border-brand-border relative group-hover:bg-white transition-all"><MessageSquare className="absolute -top-6 -left-6 text-brand-primary opacity-20 w-16 h-16" /><p className="text-lg font-bold text-brand-depth leading-relaxed italic relative z-10">"{r.comment}"</p></div>
                    </div>
-                ))}
+                )) : (
+                  <div className="p-20 text-center text-brand-muted font-black uppercase tracking-widest text-xs">Yutuqlar ma'lumotlari mavjud emas</div>
+                )}
              </div>
           </motion.div>
         );
@@ -619,7 +644,7 @@ const ParentView = () => {
           <div className="text-center lg:text-left flex-1 space-y-6">
              <div>
                 <div className="flex flex-wrap justify-center lg:justify-start items-center gap-4 mb-4">
-                   <h2 className="text-4xl md:text-6xl font-black tracking-tighter uppercase font-display leading-none">{parentData?.childName || 'Mustafo Bozorov'}</h2>
+                   <h2 className="text-4xl md:text-6xl font-black tracking-tighter uppercase font-display leading-none">{parentData?.first_name} {parentData?.last_name}</h2>
                    <div className="px-5 py-2 bg-brand-primary/20 text-brand-primary text-[10px] font-black uppercase rounded-2xl tracking-[0.3em] backdrop-blur-md border border-brand-primary/30">Premium Portal</div>
                 </div>
                 <div className="flex flex-wrap justify-center lg:justify-start items-center gap-6 md:gap-10">

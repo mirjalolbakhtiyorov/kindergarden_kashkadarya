@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { childFormSchema, ChildFormValues } from '../schemas/childForm.schema';
-import { UserCircle, Smartphone, ArrowRight, FileText } from 'lucide-react';
+import { UserCircle, Smartphone, ArrowRight, FileText, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
 import { useChildren } from '../hooks/useChildren';
 import { useGroups } from '../../groups/hooks/useGroups';
 import { useNotification } from '../../../context/NotificationContext';
@@ -16,6 +16,7 @@ export const ChildFormModal: React.FC<Props> = ({ child, onClose }) => {
   const { createChild, updateChild } = useChildren();
   const { groups } = useGroups();
   const { showNotification } = useNotification();
+  const [credentials, setCredentials] = useState<{login: string, password: string} | null>(null);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ChildFormValues>({
     resolver: zodResolver(childFormSchema),
@@ -42,7 +43,7 @@ export const ChildFormModal: React.FC<Props> = ({ child, onClose }) => {
       mother_phone: child.mother_phone,
       mother_passport: child.mother_passport || '',
       status: child.status
-    } : { status: 'DRAFT', gender: 'M', passport_info: '', address: '', weight: '', height: '', allergies: '', father_passport: '', mother_passport: '', father_workplace: '', mother_workplace: '' }
+    } : { status: 'PENDING', gender: 'M', passport_info: '', address: '', weight: '', height: '', allergies: '', father_passport: '', mother_passport: '', father_workplace: '', mother_workplace: '' }
   });
 
   const handlePassportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,8 +52,9 @@ export const ChildFormModal: React.FC<Props> = ({ child, onClose }) => {
     }
   };
 
-  const onSubmit = async (data: ChildFormValues, status: 'DRAFT' | 'PENDING') => {
+  const onSubmit = async (data: ChildFormValues) => {
     try {
+      const status = child ? data.status : 'PENDING';
       if (child) {
         await updateChild(child.id, { ...data, status });
         showNotification('Muvaffaqiyatli yangilandi!', 'success');
@@ -61,7 +63,6 @@ export const ChildFormModal: React.FC<Props> = ({ child, onClose }) => {
         const result = await createChild({ ...data, status });
         setCredentials(result);
         showNotification('Bola muvaffaqiyatli kiritildi!', 'success');
-        // If it's a creation, we don't call onClose immediately so user can see password
       }
     } catch (error) {
       showNotification('Xatolik yuz berdi', 'error');
@@ -125,7 +126,7 @@ export const ChildFormModal: React.FC<Props> = ({ child, onClose }) => {
         </div>
       </div>
 
-      <form className="space-y-10">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
         <div className="space-y-6">
           <div className="flex items-center gap-2 text-brand-primary border-b border-brand-primary/10 pb-2">
             <UserCircle size={18} />
@@ -216,27 +217,6 @@ export const ChildFormModal: React.FC<Props> = ({ child, onClose }) => {
 
         <div className="space-y-6">
           <div className="flex items-center gap-2 text-brand-primary border-b border-brand-primary/10 pb-2">
-            <ShieldCheck size={18} />
-            <h4 className="font-bold text-sm uppercase tracking-wider">Tibbiy ma'lumotlar</h4>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Vazni (kg)</label>
-              <input type="number" step="0.1" {...register('weight')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 outline-none" placeholder="15.5" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Bo'yi (cm)</label>
-              <input type="number" step="1" {...register('height')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 outline-none" placeholder="110" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-brand-muted uppercase ml-1">Allergiyalar</label>
-              <input {...register('allergies')} className="w-full bg-slate-50 border border-brand-border rounded-xl py-3 px-4 outline-none" placeholder="Sut, asal va b." />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 text-brand-primary border-b border-brand-primary/10 pb-2">
             <Smartphone size={18} />
             <h4 className="font-bold text-sm uppercase tracking-wider">Ota-ona ma'lumotlari</h4>
           </div>
@@ -278,8 +258,10 @@ export const ChildFormModal: React.FC<Props> = ({ child, onClose }) => {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-end gap-4 pt-6 border-t border-brand-border">
-          <button type="button" onClick={handleSubmit((data) => onSubmit(data, 'DRAFT'))} disabled={isSubmitting} className="w-full sm:w-auto px-6 py-3 rounded-xl border border-brand-border text-brand-slate font-bold hover:bg-slate-50 transition-colors">Draft sifatida saqlash</button>
-          <button type="button" onClick={handleSubmit((data) => onSubmit(data, 'PENDING'))} disabled={isSubmitting} className="w-full sm:w-auto px-10 py-3 rounded-xl bg-brand-primary text-white font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primary/90 transition-all flex items-center justify-center gap-2">Tasdiqlashga yuborish <ArrowRight size={18} /></button>
+          <button type="button" onClick={onClose} className="w-full sm:w-auto px-6 py-3 rounded-xl border border-brand-border text-brand-slate font-bold hover:bg-slate-50 transition-colors">Bekor qilish</button>
+          <button type="submit" disabled={isSubmitting} className="w-full sm:w-auto px-10 py-3 rounded-xl bg-brand-primary text-white font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primary/90 transition-all flex items-center justify-center gap-2">
+            {child ? 'Saqlash' : 'Tasdiqlashga yuborish'} <ArrowRight size={18} />
+          </button>
         </div>
       </form>
     </div>

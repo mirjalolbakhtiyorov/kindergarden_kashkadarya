@@ -6,6 +6,7 @@ interface User {
   login: string;
   role: UserRole;
   full_name: string;
+  childId?: string;
 }
 
 interface AuthContextType {

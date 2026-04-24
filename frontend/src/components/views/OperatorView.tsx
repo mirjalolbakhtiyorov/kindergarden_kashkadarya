@@ -13,18 +13,22 @@ import {
   Edit2, 
   Trash2, 
   Clock, 
-  History
+  History,
+  FileDown
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import * as XLSX from 'xlsx';
 import { ChildFormModal } from '../../features/children/components/ChildFormModal';
 import { ChildrenTable } from '../../features/children/components/ChildrenTable';
 import { StaffTable } from '../../features/staff/components/StaffTable';
 import { StaffFormModal } from '../../features/staff/components/StaffFormModal';
 import { GroupsList } from '../../features/groups/components/GroupsList';
+import { ParentsTable } from '../../features/parents/components/ParentsTable';
 import { useChildren } from '../../features/children/hooks/useChildren';
 import { useGroups } from '../../features/groups/hooks/useGroups';
 import { useStaff } from '../../features/staff/hooks/useStaff';
 import { useOperations } from '../../features/operations/hooks/useOperations';
+import { useNotification } from '../../context/NotificationContext';
 
 interface OperatorViewProps {
   groups: any[];
@@ -35,10 +39,85 @@ const OperatorView: React.FC<OperatorViewProps> = ({ groups: initialGroups, setG
   const [viewMode, setViewMode] = useState<'DASHBOARD' | 'ADD_CHILD' | 'ADD_STAFF' | 'MANAGE_CHILDREN' | 'MANAGE_STAFF' | 'MANAGE_GROUPS' | 'MANAGE_PARENTS'>('DASHBOARD');
   const [editingChild, setEditingChild] = useState<any>(null);
   const [editingStaff, setEditingStaff] = useState<any>(null);
-  const { children } = useChildren();
+  const { children, createChild } = useChildren();
   const { groups } = useGroups();
   const { staff } = useStaff();
   const { operations } = useOperations();
+  const { showNotification } = useNotification();
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          showNotification('Excel fayl bo\'sh!', 'error');
+          return;
+        }
+
+        showNotification(`${data.length} ta qator topildi. Import boshlandi...`, 'info');
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const row of data as any[]) {
+          try {
+            // Ustun nomlarini qidirish (aqlli qidiruv)
+            const getVal = (keys: string[]) => {
+              const foundKey = Object.keys(row).find(k => keys.includes(k.trim()));
+              return foundKey ? String(row[foundKey]).trim() : '';
+            };
+
+            const childData = {
+              first_name: getVal(['Ismi', 'Ism', 'Name', 'First Name']),
+              last_name: getVal(['Otasining ismi', 'Sharifi', 'Surname', 'Last Name', 'Patronymic']),
+              birth_date: getVal(['Tug\'ilgan sana', 'Tugilgan sana', 'Birth Date', 'DOB']),
+              age_category: getVal(['Yosh kategoriyasi', 'Yoshi', 'Age']),
+              gender: getVal(['Jinsi', 'Jins', 'Gender']).toLowerCase().includes('qiz') ? 'F' : 'M',
+              address: getVal(['Manzili', 'Manzil', 'Address']),
+              birth_certificate_number: getVal(['Guvohnoma №', 'Guvohnoma', 'Certificate', 'Birth Certificate']),
+              passport_info: getVal(['Passport', 'Pasport']),
+              father_full_name: getVal(['Otasining F.I.Sh', 'Otasi', 'Father']),
+              father_phone: getVal(['Otasining telefoni', 'Ota tel', 'Father Phone']),
+              mother_full_name: getVal(['Onasining F.I.Sh', 'Onasi', 'Mother']),
+              mother_phone: getVal(['Onasining telefoni', 'Ona tel', 'Mother Phone']),
+              group_id: groups.find(g => g.name === getVal(['Guruhi', 'Guruh', 'Group']))?.id || '',
+              status: 'PENDING'
+            };
+
+            // Tekshirish: Agar guruh topilmasa, birinchi mavjud guruhga biriktirish yoki xato berish
+            if (!childData.group_id && groups.length > 0) {
+               childData.group_id = groups[0].id;
+            }
+
+            await createChild(childData as any);
+            successCount++;
+          } catch (err) {
+            failCount++;
+            console.error('Row import failed:', row, err);
+          }
+        }
+        
+        if (failCount > 0) {
+          showNotification(`${successCount} ta muvaffaqiyatli, ${failCount} ta xato.`, 'info');
+        } else {
+          showNotification(`Barcha ${successCount} ta bola import qilindi!`, 'success');
+        }
+        e.target.value = ''; 
+      } catch (error) {
+        showNotification('Excel faylni o\'qishda xatolik', 'error');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   const getOperationIcon = (type: string) => {
     switch (type) {
@@ -92,6 +171,21 @@ const OperatorView: React.FC<OperatorViewProps> = ({ groups: initialGroups, setG
         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
            <div className="border-b border-brand-border flex items-center justify-between pb-6 mb-8">
               <h3 className="text-2xl font-black text-brand-depth">Bolalar ro'yxati</h3>
+              <div className="flex gap-3">
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls" 
+                  onChange={handleImportExcel} 
+                  className="hidden" 
+                  id="excel-import" 
+                />
+                <label 
+                  htmlFor="excel-import" 
+                  className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+                >
+                  <FileDown size={16} /> Excel Import
+                </label>
+              </div>
            </div>
            <div className="bg-white rounded-2xl border border-brand-border shadow-sm overflow-hidden">
               <ChildrenTable onEdit={handleEditChild} />
@@ -134,8 +228,8 @@ const OperatorView: React.FC<OperatorViewProps> = ({ groups: initialGroups, setG
                 Ota-onalar parollari va ID
               </h3>
            </div>
-           <div className="bg-white rounded-2xl border border-brand-border shadow-sm overflow-hidden p-20 text-center">
-              <p className="text-brand-muted font-bold uppercase tracking-widest text-xs">Ushbu bo'limda hozircha ma'lumot yo'q.</p>
+           <div className="bg-white rounded-2xl border border-brand-border shadow-sm overflow-hidden">
+              <ParentsTable />
            </div>
         </div>
       );

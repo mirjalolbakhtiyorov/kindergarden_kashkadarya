@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { childrenApi } from '../api/childrenApi';
 import { Child } from '../types/child.types';
 import { ChildFormValues } from '../schemas/childForm.schema';
+import { useNotification } from '../../../context/NotificationContext';
 
 export const useChildren = () => {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showNotification } = useNotification();
 
   const fetchChildren = useCallback(async () => {
     try {
@@ -24,11 +26,12 @@ export const useChildren = () => {
   const createChild = async (data: ChildFormValues) => {
     try {
       setLoading(true);
-      await childrenApi.create(data);
-      await fetchChildren(); // Refetch
+      const result = await childrenApi.create(data);
+      await fetchChildren(); 
       setError(null);
+      return result;
     } catch (err: any) {
-      setError(err.message || 'Failed to create child');
+      showNotification('Bolani kiritishda xatolik: ' + (err.response?.data?.error || err.message), 'error');
       throw err;
     } finally {
       setLoading(false);
@@ -42,7 +45,7 @@ export const useChildren = () => {
       await fetchChildren();
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'Failed to update child');
+      showNotification('Yangilashda xatolik: ' + (err.response?.data?.error || err.message), 'error');
       throw err;
     } finally {
       setLoading(false);
@@ -51,14 +54,13 @@ export const useChildren = () => {
 
   const deleteChild = async (id: string) => {
     try {
-      if (window.confirm('Haqiqatdan ham ushbu bolani o\'chirmoqchimisiz?')) {
-        setLoading(true);
-        await childrenApi.delete(id);
-        await fetchChildren();
-        setError(null);
-      }
+      setLoading(true);
+      await childrenApi.delete(id);
+      await fetchChildren();
+      showNotification('Bola o\'chirildi', 'success');
+      setError(null);
     } catch (err: any) {
-      setError(err.message || 'Failed to delete child');
+      showNotification('O\'chirishda xatolik: ' + (err.response?.data?.error || err.message), 'error');
       throw err;
     } finally {
       setLoading(false);

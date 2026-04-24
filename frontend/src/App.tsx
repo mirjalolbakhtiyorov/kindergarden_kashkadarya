@@ -34,17 +34,23 @@ import {
   INITIAL_LAB_SAMPLES 
 } from './constants/mockData';
 import { UserRole, Group, KitchenTask, LabSample } from './types';
+import { useGroups } from './features/groups/hooks/useGroups';
 
 const App: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [currentRole, setCurrentRole] = useState<UserRole>('PARENT');
-  const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
+  const { groups } = useGroups();
   const [kitchenTasks, setKitchenTasks] = useState<KitchenTask[]>(INITIAL_KITCHEN_TASKS);
   const [samples, setSamples] = useState<LabSample[]>(INITIAL_LAB_SAMPLES);
 
   useEffect(() => {
     if (user) {
-      setCurrentRole(user.role);
+      // Admin bo'lsa, automatik ravishda Operator sectioniga o'tkazamiz
+      if (user.role === 'ADMIN') {
+        setCurrentRole('OPERATOR');
+      } else {
+        setCurrentRole(user.role);
+      }
     }
   }, [user]);
 
@@ -57,9 +63,10 @@ const App: React.FC = () => {
       case 'DIRECTOR':
         return <DirectorView />;
       case 'ADMIN':
-        return <div className="p-8"><h2 className="text-2xl font-black">Admin Paneli</h2><p className="text-brand-muted">Tizimni to'liq nazorat qilish.</p></div>;
+        // Admin uchun default ko'rinishni OperatorView qilamiz
+        return <OperatorView groups={groups} />;
       case 'OPERATOR':
-        return <OperatorView groups={groups} setGroups={setGroups} />;
+        return <OperatorView groups={groups} />;
       case 'STOREKEEPER':
         return <StorekeeperView />;
       case 'DIETITIAN':
@@ -72,7 +79,7 @@ const App: React.FC = () => {
       case 'TEACHER':
         return <TeacherView groups={groups} />;
       case 'NURSE':
-        return <NurseView groups={groups} />;
+        return <NurseView />;
       case 'PARENT':
         return <ParentView />;
       case 'INSPECTOR':

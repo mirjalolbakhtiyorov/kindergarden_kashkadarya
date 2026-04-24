@@ -1,462 +1,459 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  ShieldCheck, 
-  Utensils, 
   Calendar, 
-  ShieldAlert, 
-  AlertCircle, 
-  Info, 
-  Coffee, 
-  Salad, 
-  Apple, 
-  ChefHat, 
-  FileText, 
-  Archive, 
-  TrendingUp, 
-  FlaskConical,
-  CheckCircle2,
-  Clock
+  ChevronLeft, 
+  ChevronRight, 
+  Utensils, 
+  Plus, 
+  Check,
+  Flame,
+  Zap,
+  Leaf,
+  Droplets,
+  Clock,
+  Camera,
+  Info
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { DISH_DATABASE } from '../../constants/mockData';
+import axios from 'axios';
+import { useNotification } from '../../context/NotificationContext';
 
-interface NutritionistViewProps {
-  groups: any[];
+const API_BASE = 'http://localhost:3001/api';
+
+interface Dish {
+  id: string;
+  name: string;
+  image: string;
+  kcal: number;
+  iron: number;
+  carbs: number;
+  vitamins: string;
 }
 
-const NutritionistView: React.FC<NutritionistViewProps> = ({ groups }) => {
-  const [activeDay, setActiveDay] = useState(1);
-  const [activeMeal, setActiveMeal] = useState<'breakfast' | 'lunch' | 'tea' | 'dinner'>('breakfast');
-  const [selectedAge, setSelectedAge] = useState<'1-3' | '3-7'>('1-3');
-  const [menuType, setMenuType] = useState<'standard' | 'alternative'>('standard');
-  const [menu, setMenu] = useState<Record<string, Record<number, Record<string, { standard: string, alternative: string }>>>>({
-    '1-3': {
-      1: { breakfast: { standard: 'd1', alternative: 'd8' }, lunch: { standard: 'd3', alternative: 'd5' }, tea: { standard: 'd6', alternative: 'd10' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      2: { breakfast: { standard: 'd2', alternative: 'd11' }, lunch: { standard: 'd4', alternative: 'd12' }, tea: { standard: 'd6', alternative: 'd13' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      3: { breakfast: { standard: 'd8', alternative: 'd1' }, lunch: { standard: 'd9', alternative: 'd3' }, tea: { standard: 'd10', alternative: 'd6' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      4: { breakfast: { standard: 'd11', alternative: 'd2' }, lunch: { standard: 'd12', alternative: 'd4' }, tea: { standard: 'd13', alternative: 'd6' }, dinner: { standard: 'd7', alternative: 'd4' } },
-      5: { breakfast: { standard: 'd1', alternative: 'd8' }, lunch: { standard: 'd5', alternative: 'd9' }, tea: { standard: 'd6', alternative: 'd10' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      6: { breakfast: { standard: 'd2', alternative: 'd11' }, lunch: { standard: 'd3', alternative: 'd12' }, tea: { standard: 'd13', alternative: 'd6' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      7: { breakfast: { standard: 'd11', alternative: 'd1' }, lunch: { standard: 'd4', alternative: 'd3' }, tea: { standard: 'd10', alternative: 'd6' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      8: { breakfast: { standard: 'd8', alternative: 'd2' }, lunch: { standard: 'd12', alternative: 'd5' }, tea: { standard: 'd6', alternative: 'd13' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      9: { breakfast: { standard: 'd1', alternative: 'd11' }, lunch: { standard: 'd9', alternative: 'd4' }, tea: { standard: 'd13', alternative: 'd10' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      10: { breakfast: { standard: 'd2', alternative: 'd8' }, lunch: { standard: 'd3', alternative: 'd9' }, tea: { standard: 'd10', alternative: 'd6' }, dinner: { standard: 'd7', alternative: 'd14' } },
-    },
-    '3-7': {
-      1: { breakfast: { standard: 'd1', alternative: 'd8' }, lunch: { standard: 'd3', alternative: 'd5' }, tea: { standard: 'd6', alternative: 'd10' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      2: { breakfast: { standard: 'd2', alternative: 'd11' }, lunch: { standard: 'd4', alternative: 'd12' }, tea: { standard: 'd6', alternative: 'd13' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      3: { breakfast: { standard: 'd8', alternative: 'd1' }, lunch: { standard: 'd9', alternative: 'd3' }, tea: { standard: 'd10', alternative: 'd6' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      4: { breakfast: { standard: 'd11', alternative: 'd2' }, lunch: { standard: 'd12', alternative: 'd4' }, tea: { standard: 'd13', alternative: 'd6' }, dinner: { standard: 'd7', alternative: 'd4' } },
-      5: { breakfast: { standard: 'd1', alternative: 'd8' }, lunch: { standard: 'd5', alternative: 'd9' }, tea: { standard: 'd6', alternative: 'd10' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      6: { breakfast: { standard: 'd2', alternative: 'd11' }, lunch: { standard: 'd3', alternative: 'd12' }, tea: { standard: 'd13', alternative: 'd6' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      7: { breakfast: { standard: 'd11', alternative: 'd1' }, lunch: { standard: 'd4', alternative: 'd3' }, tea: { standard: 'd10', alternative: 'd6' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      8: { breakfast: { standard: 'd8', alternative: 'd2' }, lunch: { standard: 'd12', alternative: 'd5' }, tea: { standard: 'd6', alternative: 'd13' }, dinner: { standard: 'd7', alternative: 'd14' } },
-      9: { breakfast: { standard: 'd1', alternative: 'd11' }, lunch: { standard: 'd9', alternative: 'd4' }, tea: { standard: 'd13', alternative: 'd10' }, dinner: { standard: 'd14', alternative: 'd7' } },
-      10: { breakfast: { standard: 'd2', alternative: 'd8' }, lunch: { standard: 'd3', alternative: 'd9' }, tea: { standard: 'd10', alternative: 'd6' }, dinner: { standard: 'd7', alternative: 'd14' } },
+const MEAL_TYPES = [
+  { id: 'BREAKFAST', label: 'Nonushta', time: '08:30' },
+  { id: 'LUNCH', label: 'Tushlik', time: '12:30' },
+  { id: 'TEA', label: 'Poldnik', time: '16:00' },
+  { id: 'DINNER', label: 'Kechki ovqat', time: '18:30' }
+];
+
+const DISHES_POOL: Dish[] = [
+  { id: '1', name: 'Sutli Botqa (Guruchli)', image: 'https://images.unsplash.com/photo-1594610367113-211440453307?auto=format&fit=crop&w=300', kcal: 250, iron: 1.2, carbs: 45, vitamins: 'A, B1, D' },
+  { id: '2', name: 'Osh (Palov)', image: 'https://images.unsplash.com/photo-1512058560366-cd2427ff5e70?auto=format&fit=crop&w=300', kcal: 450, iron: 3.5, carbs: 60, vitamins: 'B12, E, PP' },
+  { id: '3', name: 'Mastava', image: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=300', kcal: 320, iron: 2.8, carbs: 35, vitamins: 'C, B6' },
+  { id: '4', name: 'Somsa', image: 'https://images.unsplash.com/photo-1601050638917-3d8bc6029a55?auto=format&fit=crop&w=300', kcal: 280, iron: 2.1, carbs: 40, vitamins: 'A, E' },
+  { id: '5', name: 'Suli Botqasi (Oatmeal)', image: 'https://images.unsplash.com/photo-1517673132405-a56a62b18caf?auto=format&fit=crop&w=300', kcal: 210, iron: 1.5, carbs: 38, vitamins: 'B2, B5' },
+  { id: '6', name: 'Tovuqli Sho\'rva', image: 'https://images.unsplash.com/photo-1603105037880-880cd4edfb0d?auto=format&fit=crop&w=300', kcal: 280, iron: 2.5, carbs: 20, vitamins: 'A, C, D' },
+];
+
+const NutritionistView: React.FC = () => {
+  const { showNotification } = useNotification();
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [currentMenu, setCurrentMenu] = useState<any[]>([]);
+  const [dishesPool, setDishesPool] = useState<Dish[]>(DISHES_POOL);
+  const [isSelecting, setIsSelecting] = useState<{type: string, age: string, diet: string, open: boolean} | null>(null);
+  const [isManagingDishes, setIsManagingDishes] = useState(false);
+  const [newDish, setNewDish] = useState({ name: '', image: '', kcal: 0, iron: 0, carbs: 0, vitamins: '' });
+  const [loading, setLoading] = useState(false);
+
+  const [activeAgeGroup, setActiveAgeGroup] = useState<'1-3' | '3-7'>('3-7');
+  const [activeDietType, setActiveDietType] = useState<'REGULAR' | 'DIETARY'>('REGULAR');
+
+  const calendarDays = useMemo(() => {
+    const days = [];
+    for (let i = -3; i <= 6; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      days.push({
+        full: d.toISOString().split('T')[0],
+        day: d.getDate(),
+        month: d.toLocaleString('uz-UZ', { month: 'short' }),
+        weekday: d.toLocaleString('uz-UZ', { weekday: 'short' }),
+        isToday: d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]
+      });
     }
-  });
+    return days;
+  }, []);
 
-  const [status, setStatus] = useState<Record<string, Record<number, 'draft' | 'approved'>>>({
-    '1-3': { 1: 'draft', 2: 'draft' },
-    '3-7': { 1: 'draft', 2: 'draft' }
-  });
+  useEffect(() => {
+    fetchMenuForDate(selectedDate);
+    fetchDishes();
+  }, [selectedDate]);
 
-  const [manualNutrition, setManualNutrition] = useState<Record<string, Record<number, Record<string, Record<string, { starch: number, carbs: number, vitamins: string }>>>>>({});
+  const fetchMenuForDate = async (date: string) => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/menu/${date}`);
+      setCurrentMenu(res.data);
+    } catch (err) {
+      console.error("Menu fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleManualNutrientChange = (day: number, meal: string, type: 'standard' | 'alternative', field: 'starch' | 'carbs' | 'vitamins', value: any) => {
-    setManualNutrition(prev => ({
-      ...prev,
-      [selectedAge]: {
-        ...(prev[selectedAge] || {}),
-        [day]: {
-          ...(prev[selectedAge]?.[day] || {}),
-          [meal]: {
-            ...(prev[selectedAge]?.[day]?.[meal] || {}),
-            [type]: {
-              ...(prev[selectedAge]?.[day]?.[meal]?.[type] || { starch: 0, carbs: 0, vitamins: '' }),
-              [field]: field === 'vitamins' ? value : Number(value)
-            }
-          }
-        }
+  const fetchDishes = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/dishes`);
+      if (res.data && res.data.length > 0) {
+        setDishesPool(res.data);
       }
-    }));
+    } catch (err) {
+      console.error("Dishes fetch error, using fallback:", err);
+    }
   };
 
-  const getNutrient = (day: number, meal: string, type: 'standard' | 'alternative') => {
-    const dishId = menu[selectedAge][day]?.[meal]?.[type];
-    const dish = DISH_DATABASE.find(d => d.id === dishId);
-    const defaults = dish?.nutrition[selectedAge as '1-3' | '3-7'] || { kcal: 0, proteins: 0, fats: 0, carbs: 0, starch: 0, vitamins: '-' };
-    const manual = manualNutrition[selectedAge]?.[day]?.[meal]?.[type] || {};
-    
-    return {
-      ...defaults,
-      starch: manual.starch ?? defaults.starch,
-      carbs: manual.carbs ?? defaults.carbs,
-      vitamins: manual.vitamins ?? defaults.vitamins
-    };
+  const handleAddDish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_BASE}/dishes`, newDish);
+      showNotification("Yangi taom qo'shildi!", 'success');
+      fetchDishes();
+      setNewDish({ name: '', image: '', kcal: 0, iron: 0, carbs: 0, vitamins: '' });
+    } catch (err) {
+      showNotification("Xatolik yuz berdi", "error");
+    }
   };
 
-  const currentDishEntry = menu[selectedAge][activeDay]?.[activeMeal] || { standard: '', alternative: '' };
-  const currentDishId = menuType === 'standard' ? currentDishEntry.standard : currentDishEntry.alternative;
-  const currentDish = DISH_DATABASE.find(d => d.id === currentDishId);
-  const currentNutrition = useMemo(() => getNutrient(activeDay, activeMeal, menuType), [activeDay, activeMeal, menuType, selectedAge, manualNutrition, menu]);
+  const handleDeleteDish = async (id: string) => {
+    if (!window.confirm("Haqiqatan ham ushbu taomni o'chirmoqchimisiz?")) return;
+    try {
+      await axios.delete(`${API_BASE}/dishes/${id}`);
+      showNotification("Taom o'chirildi", 'success');
+      fetchDishes();
+    } catch (err) {
+      showNotification("Xatolik yuz berdi", "error");
+    }
+  };
 
-  const conflicts = useMemo(() => {
-    if (!currentDish) return [];
-    const results: { child: string, group: string, allergen: string }[] = [];
-    
-    groups.forEach(group => {
-      group.children.forEach((child: any) => {
-        const matchingAllergen = currentDish.ingredients.find(ing => 
-          child.allergy.toLowerCase().includes(ing.toLowerCase())
-        );
-        if (matchingAllergen) {
-          results.push({ child: child.name, group: group.name, allergen: matchingAllergen });
+  const handleSelectDish = async (dish: Dish) => {
+    if (!isSelecting) return;
+    try {
+      await axios.post(`${API_BASE}/menu`, {
+        date: selectedDate,
+        meal_name: dish.name,
+        meal_type: isSelecting.type,
+        age_group: isSelecting.age,
+        diet_type: isSelecting.diet,
+        nutrition: {
+          iron: dish.iron,
+          carbs: dish.carbs,
+          vitamins: dish.vitamins,
+          kcal: dish.kcal
         }
       });
-    });
-    
-    return results;
-  }, [currentDish, groups]);
-
-  const handleDishChange = (dishId: string) => {
-    setMenu(prev => ({
-      ...prev,
-      [selectedAge]: {
-        ...prev[selectedAge],
-        [activeDay]: {
-          ...(prev[selectedAge][activeDay] || { standard: '', alternative: '' }),
-          [activeMeal]: {
-            ...(prev[selectedAge][activeDay]?.[activeMeal] || { standard: '', alternative: '' }),
-            [menuType]: dishId
-          }
-        }
-      }
-    }));
-    setStatus(prev => ({
-      ...prev,
-      [selectedAge]: {
-        ...prev[selectedAge],
-        [activeDay]: 'draft'
-      }
-    }));
-  };
-
-  const handleApprove = () => {
-    if (conflicts.length > 0) {
-      alert("Diqqat! Allergiya konfliktlari mavjud. Iltimos, muammoli bolalar uchun alternativ taom belgilang!");
-      return;
+      showNotification(`${dish.name} muvaffaqiyatli tanlandi!`, 'success');
+      fetchMenuForDate(selectedDate);
+      setIsSelecting(null);
+    } catch (err) {
+      showNotification("Xatolik yuz berdi", "error");
     }
-    setStatus(prev => ({
-      ...prev,
-      [selectedAge]: {
-        ...prev[selectedAge],
-        [activeDay]: 'approved'
-      }
-    }));
-    alert(`Yosh guruhi ${selectedAge}, Kun ${activeDay} menyusi muvaffaqiyatli tasdiqlandi va oshxonaga yuborildi!`);
   };
+
+  const getMealForType = (type: string, age: string, diet: string) => {
+    return currentMenu.find(m => m.meal_type === type && m.age_group === age && m.diet_type === diet);
+  };
+
+  const filteredMenu = useMemo(() => {
+    return currentMenu.filter(m => m.age_group === activeAgeGroup && m.diet_type === activeDietType);
+  }, [currentMenu, activeAgeGroup, activeDietType]);
 
   return (
-    <div className="p-8 animate-in fade-in space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 p-8 bg-white rounded-3xl border-b-4 border-brand-primary shadow-xl">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 bg-brand-primary/10 text-brand-primary text-[10px] font-black uppercase tracking-widest rounded-full">Oziq-ovqat nazorati</span>
-            {status[selectedAge][activeDay] === 'approved' && (
-              <span className="px-3 py-1 bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1">
-                <ShieldCheck size={10} /> Tasdiqlangan
-              </span>
-            )}
-          </div>
-          <h2 className="text-4xl font-black text-brand-depth leading-none tracking-tighter">Smart Menyu Rejalashtiruvchi</h2>
-          <div className="flex flex-wrap gap-4 mt-4">
-             <div className="flex bg-slate-100 p-1 rounded-xl">
-               <button 
-                 onClick={() => setSelectedAge('1-3')}
-                 className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${selectedAge === '1-3' ? 'bg-white text-brand-primary shadow-sm' : 'text-slate-500'}`}
-               >
-                 1-3 yosh
-               </button>
-               <button 
-                 onClick={() => setSelectedAge('3-7')}
-                 className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${selectedAge === '3-7' ? 'bg-white text-brand-primary shadow-sm' : 'text-slate-500'}`}
-               >
-                 3-7 yosh
-               </button>
-             </div>
-             <div className="flex bg-brand-primary/5 p-1 rounded-xl border border-brand-primary/10">
-               <button 
-                 onClick={() => setMenuType('standard')}
-                 className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${menuType === 'standard' ? 'bg-brand-primary text-white shadow-lg' : 'text-brand-primary/60'}`}
-               >
-                 Asosiy Menyu
-               </button>
-               <button 
-                 onClick={() => setMenuType('alternative')}
-                 className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${menuType === 'alternative' ? 'bg-brand-primary text-white shadow-lg' : 'text-brand-primary/60'}`}
-               >
-                 Alternativ (Allergiya)
-               </button>
-             </div>
-          </div>
-        </div>
-        <button 
-          disabled={status[selectedAge][activeDay] === 'approved'}
-          onClick={handleApprove}
-          className={`flex items-center gap-2 px-10 py-4 rounded-2xl font-black transition-all transform active:scale-95 text-sm uppercase tracking-widest ${
-            status[selectedAge][activeDay] === 'approved'
-              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              : 'bg-brand-primary text-white shadow-xl shadow-brand-primary/30 hover:shadow-2xl hover:-translate-y-0.5'
-          }`}
-        >
-          <ShieldCheck size={20} /> TASDIQLASH
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="col-span-1 lg:col-span-3 space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-brand-border shadow-sm">
-            <h3 className="font-black text-xs uppercase tracking-widest text-brand-muted mb-6 flex items-center gap-2">
-              <Calendar size={16} className="text-brand-primary" /> Menyu Sikli (10 kun)
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[...Array(10)].map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveDay(i + 1)}
-                  className={`p-5 rounded-2xl font-black text-xl transition-all relative ${
-                    activeDay === i + 1 
-                      ? 'bg-brand-depth text-white shadow-lg scale-105 z-10' 
-                      : 'bg-brand-ghost text-brand-muted hover:bg-slate-200'
-                  }`}
-                >
-                  {i + 1}
-                  {status[selectedAge][i + 1] === 'approved' && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
-                       <CheckCircle2 size={12} className="text-white" />
-                    </div>
-                  )}
-                </button>
-              ))}
+    <div className="p-8 animate-in fade-in max-w-7xl mx-auto space-y-10">
+      <header className="bg-white p-8 rounded-[2.5rem] border border-brand-border shadow-xl shadow-slate-200/50 space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="space-y-1">
+            <h2 className="text-4xl font-black text-brand-depth tracking-tight">Oshxona Menyu Tizimi</h2>
+            <div className="flex items-center gap-4">
+              <p className="text-brand-muted font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                <Calendar size={14} className="text-brand-primary" />
+                Ovqatlanish rejasini boshqarish
+              </p>
+              <button 
+                onClick={() => setIsManagingDishes(true)}
+                className="bg-brand-primary/10 text-brand-primary px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-brand-primary hover:text-white transition-all"
+              >
+                Taomlar bazasi
+              </button>
             </div>
           </div>
-
-          <div className={`p-6 rounded-3xl border-2 transition-all ${conflicts.length > 0 ? 'bg-rose-50 border-rose-200 shadow-lg shadow-rose-100' : 'bg-brand-ghost border-transparent'}`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={`font-black text-xs uppercase tracking-widest flex items-center gap-2 ${conflicts.length > 0 ? 'text-rose-700' : 'text-brand-muted'}`}>
-                <ShieldAlert size={18} /> Allergiya Nazorati
-              </h3>
-            </div>
-            {conflicts.length > 0 ? (
-              <div className="space-y-3">
-                {conflicts.map((conf, idx) => (
-                  <div key={idx} className="bg-white p-4 rounded-2xl border border-rose-100 shadow-sm animate-in slide-in-from-left-2 duration-300">
-                    <p className="text-xs font-black text-brand-depth">{conf.child}</p>
-                    <p className="text-[10px] text-brand-muted mb-2 font-bold uppercase">{conf.group}</p>
-                    <div className="flex items-center gap-1.5 p-2 bg-rose-50 text-rose-700 rounded-xl text-[10px] font-black uppercase">
-                       <AlertCircle size={12} /> Ob'ekt: {conf.allergen}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-brand-muted flex flex-col items-center gap-2">
-                 <ShieldCheck size={40} className="opacity-20 text-emerald-500" />
-                 <p className="text-xs font-bold italic">Barchasi xavfsiz holatda</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="col-span-1 lg:col-span-9 space-y-8">
-          <div className="flex p-2 bg-white rounded-3xl border border-brand-border shadow-sm overflow-hidden">
-            {[
-              { id: 'breakfast', label: 'Nonushta', icon: Coffee },
-              { id: 'lunch', label: 'Tushlik', icon: Salad },
-              { id: 'tea', label: 'Poldnik', icon: Apple },
-              { id: 'dinner', label: 'Kechki ovqat', icon: Utensils }
-            ].map(meal => (
+          <div className="flex bg-slate-50 p-2 rounded-2xl border border-brand-border gap-2 overflow-x-auto max-w-full">
+            {calendarDays.map(d => (
               <button
-                key={meal.id}
-                onClick={() => setActiveMeal(meal.id as any)}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
-                  activeMeal === meal.id 
-                    ? 'bg-brand-primary text-white shadow-xl' 
-                    : 'text-brand-muted hover:bg-slate-50'
+                key={d.full}
+                onClick={() => setSelectedDate(d.full)}
+                className={`flex flex-col items-center justify-center min-w-[60px] py-3 rounded-xl transition-all ${
+                  selectedDate === d.full 
+                    ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30 scale-105' 
+                    : 'hover:bg-white text-brand-muted'
                 }`}
               >
-                {meal.label}
+                <span className={`text-[9px] font-black uppercase ${selectedDate === d.full ? 'text-white/80' : ''}`}>{d.weekday}</span>
+                <span className="text-lg font-black">{d.day}</span>
+                {d.isToday && <div className={`w-1 h-1 rounded-full mt-1 ${selectedDate === d.full ? 'bg-white' : 'bg-brand-primary'}`}></div>}
               </button>
             ))}
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-[40px] border border-brand-border shadow-sm space-y-6">
-               <div className="flex items-center justify-between">
-                 <h4 className="text-[10px] font-black text-brand-muted uppercase tracking-widest">Taom Tanlash ({menuType})</h4>
-                 <Utensils size={18} className="text-brand-primary" />
-               </div>
-               
-               <div className="space-y-4">
-                  {currentDish && (
-                    <div className="relative aspect-[16/10] rounded-3xl overflow-hidden border-4 border-white shadow-xl">
-                       <img src={currentDish.image} alt={currentDish.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-brand-depth to-transparent p-6">
-                         <p className="text-white text-lg font-black leading-tight">{currentDish.name}</p>
-                       </div>
-                    </div>
-                  )}
-                  <select 
-                    value={currentDishId || ''}
-                    onChange={(e) => handleDishChange(e.target.value)}
-                    className="w-full p-5 bg-brand-ghost border-2 border-transparent focus:border-brand-primary rounded-2xl font-black text-sm outline-none transition-all cursor-pointer shadow-inner"
-                  >
-                    <option value="">Taomni tanlang...</option>
-                    {DISH_DATABASE.filter(d => d.type === activeMeal).map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                  
-                  {currentDish && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {currentDish.ingredients.map(ing => (
-                        <span key={ing} className="px-3 py-1 bg-slate-100 text-[10px] font-black text-brand-depth rounded-lg uppercase tracking-wider">
-                          {ing}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-               </div>
-
-               <div className="pt-6 border-t border-slate-50 grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-emerald-50 rounded-2xl text-center">
-                    <p className="text-[9px] font-black text-emerald-800 uppercase mb-1">Norma</p>
-                    <p className="text-xl font-black text-emerald-900">{selectedAge === '1-3' ? '180' : '250'}gr</p>
-                  </div>
-                  <div className="p-4 bg-blue-50 rounded-2xl text-center">
-                    <p className="text-[9px] font-black text-blue-800 uppercase mb-1">Guruh</p>
-                    <p className="text-xl font-black text-blue-900">{selectedAge}</p>
-                  </div>
-               </div>
-            </div>
-
-            <div className="bg-brand-depth rounded-[40px] p-8 text-white relative overflow-hidden flex flex-col">
-               <div className="relative z-10 space-y-6 flex-1">
-                 <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest flex items-center gap-2">
-                   <FileText size={16} /> Texnologik Ko'rsatmalar
-                 </h4>
-                 
-                 {currentDish ? (
-                   <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                     {(currentDish.tech_card as string[]).map((step, idx) => (
-                       <div key={idx} className="flex gap-4 items-start">
-                         <span className="w-5 h-5 bg-brand-primary rounded-full flex items-center justify-center shrink-0 font-black text-[9px] mt-0.5">{idx + 1}</span>
-                         <p className="text-xs font-medium text-white/70 leading-relaxed">{step}</p>
-                       </div>
-                     ))}
-                   </div>
-                 ) : (
-                   <div className="flex flex-col items-center justify-center py-20 opacity-30">
-                     <ChefHat size={48} />
-                     <p className="text-[10px] font-black uppercase mt-4">Taom tanlanmagan</p>
-                   </div>
-                 )}
-               </div>
-
-               <div className="relative z-10 pt-6 border-t border-white/10 grid grid-cols-4 gap-2 text-center mt-6">
-                  <div className="p-2 bg-white/5 rounded-xl">
-                    <p className="text-[8px] text-white/30 font-black uppercase">KCAL</p>
-                    <p className="text-sm font-black text-brand-primary">{currentNutrition?.kcal || 0}</p>
-                  </div>
-                  <div className="p-2 bg-white/5 rounded-xl">
-                    <p className="text-[8px] text-white/30 font-black uppercase">PROT</p>
-                    <p className="text-sm font-black">{currentNutrition?.proteins || 0}</p>
-                  </div>
-                  <div className="p-2 bg-white/5 rounded-xl">
-                    <p className="text-[8px] text-white/30 font-black uppercase">FAT</p>
-                    <p className="text-sm font-black">{currentNutrition?.fats || 0}</p>
-                  </div>
-                  <div className="p-2 bg-white/5 rounded-xl">
-                    <p className="text-[8px] text-white/30 font-black uppercase">CARB</p>
-                    <p className="text-sm font-black">{currentNutrition?.carbs || 0}</p>
-                  </div>
-               </div>
-               <ChefHat size={260} className="absolute -bottom-16 -right-16 text-white/[0.03] rotate-12" />
-            </div>
+        <div className="flex flex-wrap gap-4 pt-4 border-t border-brand-border">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+            <button 
+              onClick={() => setActiveAgeGroup('1-3')}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeAgeGroup === '1-3' ? 'bg-white text-brand-primary shadow-sm' : 'text-brand-muted hover:text-brand-depth'}`}
+            >
+              1-3 yosh
+            </button>
+            <button 
+              onClick={() => setActiveAgeGroup('3-7')}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeAgeGroup === '3-7' ? 'bg-white text-brand-primary shadow-sm' : 'text-brand-muted hover:text-brand-depth'}`}
+            >
+              3-7 yosh
+            </button>
           </div>
 
-          <div className="bg-white p-8 rounded-[40px] border border-brand-border shadow-sm overflow-hidden">
-             <div className="flex items-center justify-between mb-8">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+            <button 
+              onClick={() => setActiveDietType('REGULAR')}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeDietType === 'REGULAR' ? 'bg-white text-brand-primary shadow-sm' : 'text-brand-muted hover:text-brand-depth'}`}
+            >
+              Oddiy Menyu
+            </button>
+            <button 
+              onClick={() => setActiveDietType('DIETARY')}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeDietType === 'DIETARY' ? 'bg-emerald-500 text-white shadow-sm' : 'text-brand-muted hover:text-brand-depth'}`}
+            >
+              Parhez Menyu
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Daily Menu Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {MEAL_TYPES.map(type => {
+          const savedMeal = getMealForType(type.id, activeAgeGroup, activeDietType);
+          return (
+            <div key={type.id} className="bg-white rounded-[2.5rem] border border-brand-border shadow-sm overflow-hidden flex flex-col group hover:border-brand-primary/30 transition-all">
+              <div className="p-6 border-b border-brand-border bg-slate-50/50 flex justify-between items-center">
                 <div>
-                  <h4 className="text-xl font-black text-brand-depth">Ozuqaviy Moddalar Tahlili</h4>
-                  <p className="text-xs text-brand-muted mt-1 uppercase font-bold tracking-widest italic text-amber-600">Kun {activeDay} • {selectedAge} yosh • Tahrirlash mumkin</p>
+                  <h3 className="font-black text-brand-depth uppercase text-[10px] tracking-widest">{type.label}</h3>
+                  <div className="flex items-center gap-1 text-brand-muted mt-1">
+                    <Clock size={12} />
+                    <span className="text-[10px] font-bold">{type.time}</span>
+                  </div>
                 </div>
-                <FlaskConical size={24} className="text-brand-primary" />
-             </div>
+                {savedMeal && <Check className="text-emerald-500" size={18} />}
+              </div>
 
-             <div className="overflow-x-auto">
-                <table className="w-full text-left min-w-[600px]">
-                   <thead>
-                      <tr className="bg-slate-50 text-[10px] font-black text-brand-muted uppercase tracking-widest border-b border-brand-border">
-                         <th className="px-6 py-4">Taom / Vaqt</th>
-                         <th className="px-6 py-4">Kraxmal (gr)</th>
-                         <th className="px-6 py-4">Uglevod (gr)</th>
-                         <th className="px-6 py-4">Vitaminlar</th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-100">
-                      {['breakfast', 'lunch', 'tea', 'dinner'].map(meal => {
-                         const stdD = DISH_DATABASE.find(d => d.id === menu[selectedAge][activeDay]?.[meal]?.standard);
-                         const stdN = getNutrient(activeDay, meal, 'standard');
-                         const altD = DISH_DATABASE.find(d => d.id === menu[selectedAge][activeDay]?.[meal]?.alternative);
-                         const altN = getNutrient(activeDay, meal, 'alternative');
+              <div className="flex-1 p-6 flex flex-col items-center justify-center text-center space-y-4">
+                {savedMeal ? (
+                  <>
+                    <div className="w-28 h-28 rounded-full border-4 border-slate-50 overflow-hidden shadow-xl">
+                      <img 
+                        src={dishesPool.find(d => d.name === savedMeal.meal_name)?.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=200'} 
+                        className="w-full h-full object-cover" 
+                        alt="Dish"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-black text-brand-depth text-lg">{savedMeal.meal_name}</h4>
+                      <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">{savedMeal.vitamins}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 w-full pt-4">
+                      <div className="bg-orange-50 rounded-xl p-2">
+                        <Flame size={12} className="mx-auto text-orange-500 mb-1" />
+                        <p className="text-[10px] font-black text-brand-depth">{savedMeal.calories}</p>
+                        <p className="text-[7px] text-brand-muted font-black uppercase">kkal</p>
+                      </div>
+                      <div className="bg-blue-50 rounded-xl p-2">
+                        <Zap size={12} className="mx-auto text-blue-500 mb-1" />
+                        <p className="text-[10px] font-black text-brand-depth">{savedMeal.carbohydrates}</p>
+                        <p className="text-[7px] text-brand-muted font-black uppercase">ugl</p>
+                      </div>
+                      <div className="bg-emerald-50 rounded-xl p-2">
+                        <Leaf size={12} className="mx-auto text-emerald-500 mb-1" />
+                        <p className="text-[10px] font-black text-brand-depth">{savedMeal.iron}</p>
+                        <p className="text-[7px] text-brand-muted font-black uppercase">temir</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setIsSelecting({ type: type.id, age: activeAgeGroup, diet: activeDietType, open: true })}
+                      className="mt-4 text-[9px] font-black text-brand-primary uppercase tracking-widest hover:underline"
+                    >
+                      Tahrirlash
+                    </button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => setIsSelecting({ type: type.id, age: activeAgeGroup, diet: activeDietType, open: true })}
+                    className="w-20 h-20 rounded-full bg-slate-50 border-2 border-dashed border-brand-border flex items-center justify-center text-brand-muted group-hover:bg-brand-primary/5 group-hover:border-brand-primary group-hover:text-brand-primary transition-all"
+                  >
+                    <Plus size={24} />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-                         return (
-                            <React.Fragment key={meal}>
-                               {stdD && (
-                                  <tr className="hover:bg-slate-50/50">
-                                     <td className="px-6 py-4">
-                                        <p className="text-xs font-black text-brand-depth">{stdD.name}</p>
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{meal} • Standart</p>
-                                     </td>
-                                     <td className="px-6 py-4">
-                                        <input type="number" value={stdN.starch || 0} onChange={(e) => handleManualNutrientChange(activeDay, meal, 'standard', 'starch', e.target.value)} className="w-16 p-2 bg-brand-ghost border border-brand-border rounded-lg text-xs font-black outline-none focus:border-brand-primary" />
-                                     </td>
-                                     <td className="px-6 py-4">
-                                        <input type="number" value={stdN.carbs || 0} onChange={(e) => handleManualNutrientChange(activeDay, meal, 'standard', 'carbs', e.target.value)} className="w-16 p-2 bg-brand-ghost border border-brand-border rounded-lg text-xs font-black outline-none focus:border-brand-primary" />
-                                     </td>
-                                     <td className="px-6 py-4">
-                                        <input type="text" value={stdN.vitamins || ''} onChange={(e) => handleManualNutrientChange(activeDay, meal, 'standard', 'vitamins', e.target.value)} className="w-full min-w-[120px] p-2 bg-brand-ghost border border-brand-border rounded-lg text-xs font-black outline-none focus:border-brand-primary" />
-                                     </td>
-                                  </tr>
-                               )}
-                               {altD && (
-                                  <tr className="bg-brand-primary/[0.02]">
-                                     <td className="px-6 py-4 border-l-4 border-brand-primary">
-                                        <p className="text-xs font-black text-brand-depth">{altD.name}</p>
-                                        <p className="text-[9px] font-black text-brand-primary uppercase">{meal} • Alternativ</p>
-                                     </td>
-                                     <td className="px-6 py-4">
-                                        <input type="number" value={altN.starch || 0} onChange={(e) => handleManualNutrientChange(activeDay, meal, 'alternative', 'starch', e.target.value)} className="w-16 p-2 bg-white border border-brand-border rounded-lg text-xs font-black outline-none focus:border-brand-primary shadow-sm" />
-                                     </td>
-                                     <td className="px-6 py-4">
-                                        <input type="number" value={altN.carbs || 0} onChange={(e) => handleManualNutrientChange(activeDay, meal, 'alternative', 'carbs', e.target.value)} className="w-16 p-2 bg-white border border-brand-border rounded-lg text-xs font-black outline-none focus:border-brand-primary shadow-sm" />
-                                     </td>
-                                     <td className="px-6 py-4">
-                                        <input type="text" value={altN.vitamins || ''} onChange={(e) => handleManualNutrientChange(activeDay, meal, 'alternative', 'vitamins', e.target.value)} className="w-full min-w-[120px] p-2 bg-white border border-brand-border rounded-lg text-xs font-black outline-none focus:border-brand-primary shadow-sm" />
-                                     </td>
-                                  </tr>
-                               )}
-                            </React.Fragment>
-                         );
-                      })}
-                   </tbody>
-                </table>
-             </div>
+      {/* Summary Footer */}
+      <div className="bg-brand-depth text-white p-8 rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8">
+        <div className="flex items-center gap-6">
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${activeDietType === 'DIETARY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-brand-primary'}`}>
+            <Info size={32} />
+          </div>
+          <div>
+            <h4 className="text-xl font-black">Energiya Balansi ({activeAgeGroup} yosh)</h4>
+            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">
+              {activeDietType === 'REGULAR' ? 'Oddiy kunlik me\'yorlar' : 'Maxsus parhez rejasi'}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-10">
+          <div className="text-center">
+            <p className="text-3xl font-black text-brand-primary">
+              {filteredMenu.reduce((sum, m) => sum + (m.calories || 0), 0).toFixed(0)}
+            </p>
+            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Jami Kkal</p>
+          </div>
+          <div className="text-center">
+            <p className="text-3xl font-black text-blue-400">
+              {filteredMenu.reduce((sum, m) => sum + (m.carbohydrates || 0), 0).toFixed(0)}
+            </p>
+            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Uglevodlar</p>
+          </div>
+          <div className="text-center">
+            <p className="text-3xl font-black text-emerald-400">
+              {filteredMenu.reduce((sum, m) => sum + (m.iron || 0), 0).toFixed(1)}
+            </p>
+            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Temir (mg)</p>
           </div>
         </div>
       </div>
+
+      {/* Dish Selection Modal */}
+      {isSelecting && isSelecting.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-brand-depth/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <header className="p-8 border-b border-brand-border flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-2xl font-black text-brand-depth">{MEAL_TYPES.find(t => t.id === isSelecting.type)?.label} uchun taom tanlash</h3>
+                <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest mt-1">
+                  {isSelecting.age} yosh • {isSelecting.diet === 'REGULAR' ? 'Oddiy' : 'Parhez'} taomlar ro'yxati
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsSelecting(null)}
+                className="w-12 h-12 rounded-2xl bg-white border border-brand-border flex items-center justify-center hover:bg-slate-50 transition-colors"
+              >
+                <ChevronRight className="rotate-45" size={24} />
+              </button>
+            </header>
+            
+            <div className="flex-1 overflow-y-auto p-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                {dishesPool.map(dish => (
+                  <button
+                    key={dish.id}
+                    onClick={() => handleSelectDish(dish)}
+                    className="group flex flex-col text-left space-y-3 p-2 rounded-3xl hover:bg-slate-50 transition-all border border-transparent hover:border-brand-primary/20"
+                  >
+                    <div className="aspect-square rounded-2xl overflow-hidden shadow-md group-hover:shadow-xl transition-all">
+                      <img src={dish.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={dish.name} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-brand-depth leading-tight group-hover:text-brand-primary">{dish.name}</p>
+                      <div className="flex items-center gap-1 text-[8px] font-bold text-brand-muted mt-1">
+                        <Flame size={10} className="text-orange-500" />
+                        <span>{dish.kcal} kkal</span>
+                        <span className="mx-1">•</span>
+                        <span>{dish.vitamins}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dish Management Modal */}
+      {isManagingDishes && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-brand-depth/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <header className="p-8 border-b border-brand-border flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-2xl font-black text-brand-depth">Taomlar Bazasi</h3>
+                <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest mt-1">Yangi taomlar qo'shish va mavjudlarini boshqarish</p>
+              </div>
+              <button onClick={() => setIsManagingDishes(false)} className="w-12 h-12 rounded-2xl bg-white border border-brand-border flex items-center justify-center hover:bg-slate-50">
+                <ChevronRight className="rotate-45" size={24} />
+              </button>
+            </header>
+            
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+              <div className="w-full md:w-80 p-8 border-r border-brand-border bg-slate-50/30 overflow-y-auto">
+                <h4 className="font-black text-brand-depth text-xs uppercase tracking-widest mb-6">Yangi Taom Qo'shish</h4>
+                <form onSubmit={handleAddDish} className="space-y-4">
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-brand-muted mb-1 block">Nomi</label>
+                    <input required value={newDish.name} onChange={e => setNewDish({...newDish, name: e.target.value})} className="w-full p-3 rounded-xl border border-brand-border text-xs font-bold outline-none focus:border-brand-primary" placeholder="Masalan: Tovuqli Sho'rva" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-brand-muted mb-1 block">Rasm URL</label>
+                    <input value={newDish.image} onChange={e => setNewDish({...newDish, image: e.target.value})} className="w-full p-3 rounded-xl border border-brand-border text-xs font-bold outline-none focus:border-brand-primary" placeholder="https://..." />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-brand-muted mb-1 block">Kkal</label>
+                      <input type="number" value={newDish.kcal} onChange={e => setNewDish({...newDish, kcal: Number(e.target.value)})} className="w-full p-3 rounded-xl border border-brand-border text-xs font-bold outline-none focus:border-brand-primary" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-brand-muted mb-1 block">Temir</label>
+                      <input type="number" step="0.1" value={newDish.iron} onChange={e => setNewDish({...newDish, iron: Number(e.target.value)})} className="w-full p-3 rounded-xl border border-brand-border text-xs font-bold outline-none focus:border-brand-primary" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-brand-muted mb-1 block">Ugl</label>
+                      <input type="number" value={newDish.carbs} onChange={e => setNewDish({...newDish, carbs: Number(e.target.value)})} className="w-full p-3 rounded-xl border border-brand-border text-xs font-bold outline-none focus:border-brand-primary" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-brand-muted mb-1 block">Vitaminlar</label>
+                      <input value={newDish.vitamins} onChange={e => setNewDish({...newDish, vitamins: e.target.value})} className="w-full p-3 rounded-xl border border-brand-border text-xs font-bold outline-none focus:border-brand-primary" placeholder="A, C, D" />
+                    </div>
+                  </div>
+                  <button type="submit" className="w-full py-4 bg-brand-primary text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-brand-primary/30 hover:scale-105 transition-all">Qo'shish</button>
+                </form>
+              </div>
+              
+              <div className="flex-1 p-8 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {dishesPool.map(dish => (
+                    <div key={dish.id} className="bg-white border border-brand-border p-4 rounded-3xl flex items-center gap-4 relative group">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0">
+                        <img src={dish.image} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h5 className="font-black text-brand-depth text-xs truncate">{dish.name}</h5>
+                        <p className="text-[9px] text-brand-muted font-bold">{dish.kcal} kkal • {dish.vitamins}</p>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteDish(dish.id)}
+                        className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                      >
+                        <ChevronRight className="rotate-45" size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

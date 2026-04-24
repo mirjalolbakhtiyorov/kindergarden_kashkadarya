@@ -140,6 +140,7 @@ function initDb() {
         date TEXT NOT NULL,
         status TEXT NOT NULL,
         reason TEXT,
+        UNIQUE(child_id, date),
         FOREIGN KEY (child_id) REFERENCES children(id)
       )
     `);
@@ -216,6 +217,22 @@ function initDb() {
         full_name TEXT,
         status TEXT DEFAULT 'ACTIVE',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS health_checks (
+        id TEXT PRIMARY KEY,
+        child_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        weight REAL,
+        height REAL,
+        temperature REAL,
+        allergy TEXT,
+        is_sick BOOLEAN,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (child_id) REFERENCES children(id)
       )
     `);
 
