@@ -27,6 +27,7 @@ interface MedicalData {
   height: string;
   temperature: string;
   allergy: string;
+  isAllergic: boolean;
   isSick: boolean;
   notes: string;
 }
@@ -111,6 +112,7 @@ const NurseView: React.FC = () => {
           height: c.height?.toString() || '',
           temperature: '',
           allergy: c.allergies || '',
+          isAllergic: !!c.allergies,
           isSick: false,
           notes: c.medical_notes || ''
         };
@@ -134,7 +136,7 @@ const NurseView: React.FC = () => {
 
   const stats = useMemo(() => {
     const total = children.length;
-    const records = Object.values(medicalRecords);
+    const records = Object.values(medicalRecords) as MedicalData[];
     const sickCount = records.filter(r => r.isSick).length;
     const measuredCount = records.filter(r => r.weight || r.height || r.temperature).length;
 
@@ -159,15 +161,18 @@ const NurseView: React.FC = () => {
   const handleSave = async () => {
     if (!selectedGroup) return;
 
-    const recordsToSave = Object.entries(medicalRecords).map(([childId, data]) => ({
-      child_id: childId,
-      weight: parseFloat(data.weight) || null,
-      height: parseFloat(data.height) || null,
-      temperature: parseFloat(data.temperature) || null,
-      allergy: data.allergy,
-      is_sick: data.isSick,
-      notes: data.notes
-    }));
+    const recordsToSave = Object.entries(medicalRecords).map(([childId, recordData]) => {
+      const data = recordData as MedicalData;
+      return {
+        child_id: childId,
+        weight: parseFloat(data.weight) || null,
+        height: parseFloat(data.height) || null,
+        temperature: parseFloat(data.temperature) || null,
+        allergy: data.allergy,
+        is_sick: data.isSick,
+        notes: data.notes
+      };
+    });
 
     try {
       await axios.post(`${API_BASE}/health/batch`, {
@@ -517,7 +522,7 @@ const NurseView: React.FC = () => {
                           <input 
                             type="checkbox"
                             checked={record.isAllergic}
-                            onChange={(e) => handleDataChange(child.id, 'isAllergic', e.target.checked)}
+                            onChange={(e) => handleDataChange(child.id, 'allergy', e.target.checked ? 'ALLERGIC' : '')}
                             className="w-4 h-4 rounded border-orange-200 text-orange-500 focus:ring-orange-500/20"
                           />
                         </div>

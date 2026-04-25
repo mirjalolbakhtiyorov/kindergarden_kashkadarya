@@ -19,7 +19,7 @@ export const StaffFormModal: React.FC<Props> = ({ staffMember, onClose }) => {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
-    defaultValues: staffMember ? {
+    defaultValues: (staffMember ? {
       full_name: staffMember.full_name,
       position: staffMember.position,
       phone: staffMember.phone,
@@ -29,8 +29,18 @@ export const StaffFormModal: React.FC<Props> = ({ staffMember, onClose }) => {
       education: staffMember.education || '',
       experience_years: staffMember.experience_years?.toString() || '',
       group_id: staffMember.group_id || '',
-      status: staffMember.status
-    } : { status: 'ACTIVE', group_id: '' }
+      status: staffMember.status as StaffFormValues['status']
+    } : { 
+      status: 'ACTIVE', 
+      group_id: '',
+      full_name: '',
+      position: '',
+      phone: '',
+      passport_no: '',
+      birth_date: '',
+      education: '',
+      experience_years: ''
+    }) as StaffFormValues
   });
 
   const onSubmit = async (data: StaffFormValues) => {

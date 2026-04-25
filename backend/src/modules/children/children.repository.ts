@@ -80,23 +80,32 @@ export class ChildrenRepository {
         stmtChild.finalize();
 
         // Find parent IDs to update them too
-        db.get('SELECT father_id, mother_id FROM children WHERE id = ?', [id], async (err, child) => {
+        db.get('SELECT father_id, mother_id FROM children WHERE id = ?', [id], async (err, child: any) => {
           if (err || !child) {
             db.run('ROLLBACK');
             return reject(err || new Error('Child not found'));
           }
 
-          const stmtParent = db.prepare('UPDATE parents SET full_name = ?, workplace = ?, phone = ?, passport_no = ? WHERE id = ?');
-          stmtParent.run([data.father_full_name, data.father_workplace, data.father_phone, data.father_passport, child.father_id]);
-          stmtParent.run([data.mother_full_name, data.mother_workplace, data.mother_phone, data.mother_passport, child.mother_id]);
-          stmtParent.finalize();
+          try {
+            const stmtParent = db.prepare('UPDATE parents SET full_name = ?, workplace = ?, phone = ?, passport_no = ? WHERE id = ?');
+            stmtParent.run([data.father_full_name, data.father_workplace, data.father_phone, data.father_passport, child.father_id]);
+            stmtParent.run([data.mother_full_name, data.mother_workplace, data.mother_phone, data.mother_passport, child.mother_id]);
+            stmtParent.finalize();
 
-          await OperationsRepository.log('UPDATE', 'CHILD', `${data.first_name} ${data.last_name}`, 'Bolaning ma\'lumotlari tahrirlandi');
-          
-          db.run('COMMIT', (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
+            await OperationsRepository.log('UPDATE', 'CHILD', `${data.first_name} ${data.last_name}`, 'Bolaning ma\'lumotlari tahrirlandi');
+            
+            db.run('COMMIT', (err) => {
+              if (err) {
+                db.run('ROLLBACK');
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          } catch (error) {
+            db.run('ROLLBACK');
+            reject(error);
+          }
         });
       });
     });

@@ -1,3 +1,5 @@
+import { GroupFormValues } from '../schemas/groupForm.schema';
+
 export interface Group {
   id: string;
   name: string;
@@ -5,3 +7,5 @@ export interface Group {
   capacity: number;
   age_limit: string;
 }
+
+export type { GroupFormValues };

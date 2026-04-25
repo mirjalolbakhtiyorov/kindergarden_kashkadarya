@@ -81,6 +81,113 @@ app.get("/api/parent-portal/child-info/:childId", (req, res) => {
   });
 });
 
+app.put("/api/parent-portal/profile/:childId", async (req, res) => {
+  const { childId } = req.params;
+  const { address, father, mother } = req.body;
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    // 1. Update child address
+    db.run('UPDATE children SET address = ? WHERE id = ?', [address, childId], function(err) {
+      if (err) {
+        db.run("ROLLBACK");
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // 2. Get father and mother IDs
+    db.get('SELECT father_id, mother_id FROM children WHERE id = ?', [childId], (err, child: any) => {
+      if (err || !child) {
+        db.run("ROLLBACK");
+        return res.status(500).json({ error: err?.message || "Bola topilmadi" });
+      }
+
+      // 3. Update father data
+      db.run('UPDATE parents SET workplace = ?, phone = ?, passport_no = ? WHERE id = ?', 
+        [father.workplace, father.phone, father.passport_no, child.father_id], (err) => {
+          if (err) {
+            db.run("ROLLBACK");
+            return res.status(500).json({ error: err.message });
+          }
+        }
+      );
+
+      // 4. Update mother data
+      db.run('UPDATE parents SET workplace = ?, phone = ?, passport_no = ? WHERE id = ?', 
+        [mother.workplace, mother.phone, mother.passport_no, child.mother_id], (err) => {
+          if (err) {
+            db.run("ROLLBACK");
+            return res.status(500).json({ error: err.message });
+          }
+          
+          db.run("COMMIT", (err) => {
+            if (err) res.status(500).json({ error: err.message });
+            else res.json({ success: true });
+          });
+        }
+      );
+    });
+  });
+});
+
+app.get("/api/parent-portal/full-data/:childId", async (req, res) => {
+  const { childId } = req.params;
+  
+  const fetchAll = (sql: string, params: any[] = []) => new Promise((resolve) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        console.warn(`Query failed: ${sql}`, err.message);
+        resolve([]); // Return empty array on error instead of rejecting
+      } else {
+        resolve(rows || []);
+      }
+    });
+  });
+
+  const fetchOne = (sql: string, params: any[]) => new Promise((resolve) => {
+    db.get(sql, params, (err, row) => {
+      if (err) resolve(null);
+      else resolve(row);
+    });
+  });
+
+  try {
+    const [attendance, payments, health, vaccines, progress, pickups, documents] = await Promise.all([
+      fetchAll('SELECT * FROM attendance WHERE child_id = ? ORDER BY date DESC LIMIT 30', [childId]),
+      fetchAll('SELECT * FROM payments WHERE child_id = ? ORDER BY date DESC', [childId]),
+      fetchAll('SELECT * FROM health_checks WHERE child_id = ? ORDER BY date DESC LIMIT 10', [childId]),
+      fetchAll('SELECT * FROM vaccinations WHERE child_id = ?', [childId]),
+      fetchAll('SELECT * FROM progress_reports WHERE child_id = ? ORDER BY date DESC', [childId]),
+      fetchAll('SELECT * FROM authorized_pickups WHERE child_id = ?', [childId]),
+      fetchAll('SELECT * FROM child_documents WHERE child_id = ?', [childId])
+    ]);
+
+    const child: any = await fetchOne('SELECT age_category, is_allergic FROM children WHERE id = ?', [childId]);
+    
+    // Default values if child not found
+    const ageGroup = child?.age_category?.includes('1-3') ? '1-3' : '3-7';
+    const dietType = child?.is_allergic ? 'DIETARY' : 'REGULAR';
+    const today = new Date().toISOString().split('T')[0];
+
+    const menu = await fetchAll('SELECT * FROM menus WHERE date = ? AND age_group = ? AND diet_type = ?', [today, ageGroup, dietType]);
+
+    res.json({
+      attendance,
+      payments,
+      health,
+      vaccines,
+      progress,
+      pickups,
+      documents,
+      menu
+    });
+  } catch (err: any) {
+    console.error("DEBUG: Parent portal full-data critical error:", err);
+    res.status(500).json({ error: "Ma'lumotlarni yig'ishda ichki xatolik" });
+  }
+});
+
 const childrenController = new ChildrenController();
 app.post("/api/children", childrenController.create);
 app.get("/api/children", childrenController.getAll);
@@ -275,38 +382,6 @@ app.delete("/api/parents/:id", (req, res) => {
   });
 });
 
-app.get("/api/parent-portal/full-data/:childId", async (req, res) => {
-  const { childId } = req.params;
-  const data: any = {};
-
-  try {
-    const fetchAll = (sql: string, params: any[]) => new Promise((resolve, reject) => {
-      db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-    });
-    const fetchOne = (sql: string, params: any[]) => new Promise((resolve, reject) => {
-      db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
-    });
-
-    data.payments = await fetchAll('SELECT * FROM payments WHERE child_id = ? ORDER BY date DESC', [childId]);
-    data.attendance = await fetchAll('SELECT * FROM attendance WHERE child_id = ? ORDER BY date DESC', [childId]);
-    data.documents = await fetchAll('SELECT * FROM documents WHERE child_id = ? ORDER BY created_at DESC', [childId]);
-    data.authorizedPickups = await fetchAll('SELECT * FROM authorized_pickups WHERE child_id = ?', [childId]);
-    data.progressReports = await fetchAll('SELECT * FROM progress_reports WHERE child_id = ? ORDER BY date DESC', [childId]);
-    data.vaccinations = await fetchAll('SELECT * FROM vaccinations WHERE child_id = ? ORDER BY planned_date ASC', [childId]);
-
-    const child: any = await fetchOne('SELECT age_category, is_allergic FROM children WHERE id = ?', [childId]);
-    const ageGroup = child?.age_category?.includes('1-3') ? '1-3' : '3-7';
-    const dietType = child?.is_allergic ? 'DIETARY' : 'REGULAR';
-
-    const today = new Date().toISOString().split('T')[0];
-    data.menu = await fetchAll('SELECT * FROM menus WHERE date = ? AND age_group = ? AND diet_type = ?', [today, ageGroup, dietType]);
-
-    res.json(data);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Attendance API
 app.get("/api/attendance/:groupId/:date", (req, res) => {
   const { groupId, date } = req.params;
@@ -446,169 +521,6 @@ app.post("/api/kitchen/tasks/:menuId/status", (req, res) => {
   });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Backend API running on http://0.0.0.0:${PORT}`);
-});
-
-// Database initialization for Warehouse
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    unit TEXT NOT NULL,
-    brand TEXT,
-    min_stock REAL DEFAULT 0
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS inventory_batches (
-    id TEXT PRIMARY KEY,
-    product_id TEXT NOT NULL,
-    quantity REAL NOT NULL,
-    price_per_unit REAL,
-    total_price REAL,
-    received_date TEXT NOT NULL,
-    expiry_date TEXT,
-    supplier TEXT,
-    storage_location TEXT,
-    storage_temp REAL,
-    notes TEXT,
-    FOREIGN KEY (product_id) REFERENCES products(id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS inventory_transactions (
-    id TEXT PRIMARY KEY,
-    product_id TEXT NOT NULL,
-    type TEXT NOT NULL, -- 'IN' or 'OUT'
-    quantity REAL NOT NULL,
-    price REAL,
-    date TEXT NOT NULL,
-    batch_id TEXT,
-    FOREIGN KEY (product_id) REFERENCES products(id)
-  )`);
-});
-
-// Inventory API Endpoints
-app.get("/api/inventory/products", (req, res) => {
-  db.all(`
-    SELECT p.*, IFNULL(SUM(b.quantity), 0) as total_quantity 
-    FROM products p
-    LEFT JOIN inventory_batches b ON p.id = b.product_id
-    GROUP BY p.id
-  `, [], (err, rows) => {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json(rows);
-  });
-});
-
-app.post("/api/inventory/products", (req, res) => {
-  const { name, category, unit, brand, min_stock } = req.body;
-  const id = crypto.randomUUID();
-  db.run(`INSERT INTO products (id, name, category, unit, brand, min_stock) VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, name, category, unit, brand, min_stock || 0],
-    function(err) {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ success: true, id });
-    }
-  );
-});
-
-app.put("/api/inventory/products/:id", (req, res) => {
-  const { id } = req.params;
-  const { name, category, unit, brand, min_stock } = req.body;
-  db.run(`
-    UPDATE products 
-    SET name = ?, category = ?, unit = ?, brand = ?, min_stock = ?
-    WHERE id = ?
-  `, [name, category, unit, brand, min_stock, id], function(err) {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true });
-  });
-});
-
-app.get("/api/inventory/batches", (req, res) => {
-  db.all(`
-    SELECT b.*, p.name as product_name, p.unit 
-    FROM inventory_batches b
-    JOIN products p ON b.product_id = p.id
-    WHERE b.quantity > 0
-    ORDER BY b.expiry_date ASC
-  `, [], (err, rows) => {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json(rows);
-  });
-});
-
-app.post("/api/inventory/stock-in", (req, res) => {
-  const { 
-    product_id, quantity, batch_number, invoice_number, 
-    price_per_unit, total_price, expiry_date, supplier, 
-    received_date, storage_location, storage_temp, notes 
-  } = req.body;
-  
-  const batch_id = crypto.randomUUID();
-  const trans_id = crypto.randomUUID();
-  const today = received_date || new Date().toISOString().split('T')[0];
-
-  db.serialize(() => {
-    db.run("BEGIN TRANSACTION");
-    db.run(`
-      INSERT INTO inventory_batches (
-        id, product_id, batch_number, invoice_number, quantity, 
-        price_per_unit, total_price, received_date, expiry_date, 
-        supplier, storage_location, storage_temp, notes
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      batch_id, product_id, batch_number, invoice_number, quantity, 
-      price_per_unit, total_price, today, expiry_date, 
-      supplier, storage_location, storage_temp, notes
-    ]);
-
-    db.run(`
-      INSERT INTO inventory_transactions (id, product_id, type, quantity, price, date, batch_id)
-      VALUES (?, ?, 'IN', ?, ?, ?, ?)
-    `, [trans_id, product_id, quantity, price_per_unit, today, batch_id]);
-
-    db.run("COMMIT", (err) => {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ success: true });
-    });
-  });
-});
-
-app.post("/api/inventory/stock-out", (req, res) => {
-  const { product_id, quantity, date } = req.body;
-  const today = date || new Date().toISOString().split('T')[0];
-  let remainingToOut = quantity;
-
-  db.all(`SELECT * FROM inventory_batches WHERE product_id = ? AND quantity > 0 ORDER BY expiry_date ASC`, [product_id], (err, batches: any[]) => {
-    if (err) return res.status(500).json({ error: err.message });
-    
-    const totalAvailable = batches.reduce((sum, b) => sum + b.quantity, 0);
-    if (totalAvailable < quantity) return res.status(400).json({ error: "Omborda yetarli mahsulot yo'q" });
-
-    db.serialize(() => {
-      db.run("BEGIN TRANSACTION");
-      for (const batch of batches) {
-        if (remainingToOut <= 0) break;
-        const take = Math.min(batch.quantity, remainingToOut);
-        db.run(`UPDATE inventory_batches SET quantity = quantity - ? WHERE id = ?`, [take, batch.id]);
-        remainingToOut -= take;
-      }
-      db.run(`
-        INSERT INTO inventory_transactions (id, product_id, type, quantity, date)
-        VALUES (?, ?, 'OUT', ?, ?)
-      `, [crypto.randomUUID(), product_id, quantity, today]);
-
-      db.run("COMMIT", (err) => {
-        if (err) res.status(500).json({ error: err.message });
-        else res.json({ success: true });
-      });
-    });
-  });
-});
-
 app.get("/api/inventory/transactions", (req, res) => {
   db.all(`
     SELECT t.*, p.name as product_name, p.unit, p.category
@@ -620,4 +532,323 @@ app.get("/api/inventory/transactions", (req, res) => {
     if (err) res.status(500).json({ error: err.message });
     else res.json(rows);
   });
+});
+
+app.get("/api/inventory/products", (req, res) => {
+  db.all('SELECT * FROM products', [], (err, products: any[]) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    db.all('SELECT * FROM inventory_batches', [], (err, batches: any[]) => {
+      if (err) return res.status(500).json({ error: err.message });
+      
+      const productsWithBatches = products.map(p => ({
+        ...p,
+        batches: batches.filter(b => b.product_id === p.id).map(b => ({
+          ...b,
+          expiryDate: b.expiry_date, // Frontend camelCase compatibility
+          receivedDate: b.received_date,
+          batchNumber: b.batch_number,
+          pricePerUnit: b.price_per_unit,
+          totalPrice: b.total_price,
+          storageLocation: b.storage_location,
+          storageTemp: b.storage_temp
+        }))
+      }));
+      res.json(productsWithBatches);
+    });
+  });
+});
+
+app.post("/api/inventory/products", (req, res) => {
+  const { name, category, unit, brand, min_stock } = req.body;
+  const id = crypto.randomUUID();
+  db.run(`
+    INSERT INTO products (id, name, category, unit, brand, min_stock)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, [id, name, category, unit, brand, min_stock || 0], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true, id });
+  });
+});
+
+app.put("/api/inventory/products/:id", (req, res) => {
+  const { id } = req.params;
+  const { name, category, unit, brand, min_stock } = req.body;
+  db.run(`
+    UPDATE products SET name = ?, category = ?, unit = ?, brand = ?, min_stock = ?
+    WHERE id = ?
+  `, [name, category, unit, brand, min_stock, id], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true });
+  });
+});
+
+app.post("/api/inventory/stock-in", (req, res) => {
+  const { 
+    product_id, batch_number, invoice_number, quantity, price_per_unit, 
+    total_price, received_date, expiry_date, supplier, 
+    storage_location, storage_temp, notes 
+  } = req.body;
+  
+  const batchId = crypto.randomUUID();
+  const transId = crypto.randomUUID();
+  const date = received_date || new Date().toISOString().split('T')[0];
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+    
+    db.run(`
+      INSERT INTO inventory_batches (
+        id, product_id, batch_number, invoice_number, quantity, price_per_unit, 
+        total_price, received_date, expiry_date, supplier, 
+        storage_location, storage_temp, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      batchId, product_id, batch_number, invoice_number, quantity, price_per_unit,
+      total_price, date, expiry_date, supplier,
+      storage_location, storage_temp, notes
+    ]);
+
+    db.run(`
+      INSERT INTO inventory_transactions (id, product_id, type, quantity, price, date, batch_id)
+      VALUES (?, ?, 'IN', ?, ?, ?, ?)
+    `, [transId, product_id, quantity, price_per_unit, date, batchId]);
+
+    db.run("COMMIT", (err) => {
+      if (err) res.status(500).json({ error: err.message });
+      else res.json({ success: true, batchId });
+    });
+  });
+});
+
+app.post("/api/inventory/stock-out", (req, res) => {
+  const { product_id, quantity, date, reason } = req.body;
+  const outDate = date || new Date().toISOString().split('T')[0];
+  
+  db.all('SELECT * FROM inventory_batches WHERE product_id = ? AND quantity > 0 ORDER BY expiry_date ASC, received_date ASC', [product_id], (err, batches: any[]) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    let remainingToOut = quantity;
+    const updates: any[] = [];
+    const transactions: any[] = [];
+
+    for (const batch of batches) {
+      if (remainingToOut <= 0) break;
+      const amountFromBatch = Math.min(batch.quantity, remainingToOut);
+      updates.push({ id: batch.id, newQty: batch.quantity - amountFromBatch });
+      transactions.push({ 
+        id: crypto.randomUUID(), 
+        product_id, 
+        type: 'OUT', 
+        quantity: amountFromBatch, 
+        price: batch.price_per_unit, 
+        date: outDate, 
+        batch_id: batch.id 
+      });
+      remainingToOut -= amountFromBatch;
+    }
+
+    if (remainingToOut > 0) {
+      return res.status(400).json({ error: "Omborda yetarli mahsulot yo'q" });
+    }
+
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+      updates.forEach(u => {
+        db.run('UPDATE inventory_batches SET quantity = ? WHERE id = ?', [u.newQty, u.id]);
+      });
+      transactions.forEach(t => {
+        db.run(`
+          INSERT INTO inventory_transactions (id, product_id, type, quantity, price, date, batch_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [t.id, t.product_id, t.type, t.quantity, t.price, t.date, t.batch_id]);
+      });
+      db.run("COMMIT", (err) => {
+        if (err) res.status(500).json({ error: err.message });
+        else res.json({ success: true });
+      });
+    });
+  });
+});
+
+// Lab Samples API
+app.get("/api/lab/samples", (req, res) => {
+  db.all('SELECT * FROM lab_samples ORDER BY timestamp DESC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const parsedRows = rows.map((row: any) => ({
+      ...row,
+      test_results: row.test_results ? JSON.parse(row.test_results) : null,
+      storage_temp_history: row.storage_temp_history ? JSON.parse(row.storage_temp_history) : [],
+      nutrition: row.nutrition ? JSON.parse(row.nutrition) : null
+    }));
+    res.json(parsedRows);
+  });
+});
+
+app.post("/api/lab/samples", (req, res) => {
+  const { 
+    sample_id, dish_id, dish_name, batch_reference, date, 
+    storage_location, storage_duration, status, lab_result, 
+    risk_level, notes, test_results, storage_temp_history, 
+    nutrition, created_by 
+  } = req.body;
+  
+  const id = crypto.randomUUID();
+  db.run(`
+    INSERT INTO lab_samples (
+      id, sample_id, dish_id, dish_name, batch_reference, date, 
+      storage_location, storage_duration, status, lab_result, 
+      risk_level, notes, test_results, storage_temp_history, 
+      nutrition, created_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    id, sample_id, dish_id, dish_name, batch_reference, date, 
+    storage_location, storage_duration || 72, status, lab_result, 
+    risk_level, notes, JSON.stringify(test_results), 
+    JSON.stringify(storage_temp_history), JSON.stringify(nutrition), created_by
+  ], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true, id });
+  });
+});
+
+// Audits API
+app.get("/api/audits", (req, res) => {
+  db.all('SELECT * FROM audits ORDER BY created_at DESC', [], (err, audits: any[]) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    db.all('SELECT * FROM audit_items', [], (err, items: any[]) => {
+      if (err) return res.status(500).json({ error: err.message });
+      
+      const fullAudits = audits.map(audit => ({
+        ...audit,
+        checklist_items: items.filter(item => item.audit_id === audit.id).map(it => ({
+          ...it,
+          result: it.result,
+          question: it.question
+        }))
+      }));
+      res.json(fullAudits);
+    });
+  });
+});
+
+app.post("/api/audits", (req, res) => {
+  const { inspection_id, inspection_type, overall_result, severity, notes, created_by, status, checklist_items } = req.body;
+  const audit_id = crypto.randomUUID();
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+    db.run(`
+      INSERT INTO audits (id, inspection_id, inspection_type, overall_result, severity, notes, created_by, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [audit_id, inspection_id, inspection_type, overall_result, severity, notes, created_by, status || 'OPEN']);
+
+    if (checklist_items && Array.isArray(checklist_items)) {
+      const stmt = db.prepare(`
+        INSERT INTO audit_items (id, audit_id, question, result, note, severity)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      checklist_items.forEach((item: any) => {
+        stmt.run(crypto.randomUUID(), audit_id, item.question, item.result, item.note, item.severity);
+      });
+      stmt.finalize();
+    }
+
+    db.run("COMMIT", (err) => {
+      if (err) res.status(500).json({ error: err.message });
+      else res.json({ success: true, id: audit_id });
+    });
+  });
+});
+
+// Finance API
+app.get("/api/finance/transactions", (req, res) => {
+  db.all('SELECT * FROM finance_transactions ORDER BY date DESC, created_at DESC', [], (err, rows) => {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json(rows);
+  });
+});
+
+app.post("/api/finance/transactions", (req, res) => {
+  const { date, category, item, amount, quantity, price_per_unit, type } = req.body;
+  const id = crypto.randomUUID();
+  db.run(`
+    INSERT INTO finance_transactions (id, date, category, item, amount, quantity, price_per_unit, type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [id, date, category, item, amount, quantity, price_per_unit, type || 'EXPENSE'], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true, id });
+  });
+});
+
+// Supply API
+app.get("/api/supply/orders", (req, res) => {
+  db.all('SELECT * FROM supply_orders ORDER BY date DESC', [], (err, rows) => {
+    if (err) res.status(500).json({ error: err.message });
+    else {
+      const parsed = rows.map((row: any) => ({
+        ...row,
+        items: row.items ? JSON.parse(row.items) : []
+      }));
+      res.json(parsed);
+    }
+  });
+});
+
+app.post("/api/supply/orders", (req, res) => {
+  const { order_id, vendor, amount, date, status, items } = req.body;
+  const id = crypto.randomUUID();
+  db.run(`
+    INSERT INTO supply_orders (id, order_id, vendor, amount, date, status, items)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, [id, order_id, vendor, amount, date, status, JSON.stringify(items)], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true, id });
+  });
+});
+
+app.get("/api/suppliers", (req, res) => {
+  db.all('SELECT * FROM suppliers ORDER BY name ASC', [], (err, rows) => {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json(rows);
+  });
+});
+
+app.post("/api/suppliers", (req, res) => {
+  const { first_name, last_name, brand, phone, contact_user, telegram_link, type, score } = req.body;
+  const id = crypto.randomUUID();
+  const name = `${first_name} ${last_name}`.trim() || brand || 'Noma\'lum';
+  
+  db.run(`
+    INSERT INTO suppliers (id, first_name, last_name, brand, name, type, score, phone, contact_user, telegram_link)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [id, first_name, last_name, brand, name, type || 'Ta\'minotchi', score || 5.0, phone, contact_user, telegram_link], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true, id });
+  });
+});
+
+// Required Products API
+app.get("/api/supply/required-products", (req, res) => {
+  db.all('SELECT * FROM required_products ORDER BY created_at DESC', [], (err, rows) => {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json(rows);
+  });
+});
+
+app.post("/api/supply/required-products", (req, res) => {
+  const { name, price, quantity, unit, brand, category } = req.body;
+  const id = crypto.randomUUID();
+  db.run(`
+    INSERT INTO required_products (id, name, price, quantity, unit, brand, category)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, [id, name, price, quantity, unit, brand, category], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true, id });
+  });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Backend API running on http://0.0.0.0:${PORT}`);
 });

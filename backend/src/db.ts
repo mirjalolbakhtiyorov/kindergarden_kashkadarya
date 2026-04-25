@@ -246,5 +246,160 @@ function initDb() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Lab Samples Table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS lab_samples (
+        id TEXT PRIMARY KEY,
+        sample_id TEXT UNIQUE NOT NULL,
+        dish_id TEXT,
+        dish_name TEXT NOT NULL,
+        batch_reference TEXT,
+        date TEXT NOT NULL,
+        storage_location TEXT,
+        storage_duration INTEGER DEFAULT 72,
+        status TEXT NOT NULL,
+        lab_result TEXT,
+        risk_level TEXT NOT NULL,
+        notes TEXT,
+        test_results TEXT, -- JSON string
+        storage_temp_history TEXT, -- JSON string
+        nutrition TEXT, -- JSON string
+        created_by TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Audits & Inspections
+    db.run(`
+      CREATE TABLE IF NOT EXISTS audits (
+        id TEXT PRIMARY KEY,
+        inspection_id TEXT UNIQUE NOT NULL,
+        inspection_type TEXT NOT NULL,
+        overall_result TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        notes TEXT,
+        created_by TEXT,
+        status TEXT DEFAULT 'OPEN',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS audit_items (
+        id TEXT PRIMARY KEY,
+        audit_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        result TEXT NOT NULL,
+        note TEXT,
+        severity TEXT,
+        FOREIGN KEY (audit_id) REFERENCES audits(id)
+      )
+    `);
+
+    // Finance Transactions
+    db.run(`
+      CREATE TABLE IF NOT EXISTS finance_transactions (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        category TEXT NOT NULL,
+        item TEXT NOT NULL,
+        amount REAL NOT NULL,
+        quantity TEXT,
+        price_per_unit TEXT,
+        type TEXT DEFAULT 'EXPENSE',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        unit TEXT NOT NULL,
+        brand TEXT,
+        min_stock REAL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS inventory_batches (
+        id TEXT PRIMARY KEY,
+        product_id TEXT NOT NULL,
+        batch_number TEXT,
+        invoice_number TEXT,
+        quantity REAL NOT NULL,
+        price_per_unit REAL,
+        total_price REAL,
+        received_date TEXT NOT NULL,
+        expiry_date TEXT,
+        supplier TEXT,
+        storage_location TEXT,
+        storage_temp REAL,
+        notes TEXT,
+        FOREIGN KEY (product_id) REFERENCES products(id)
+      )
+    `);
+    addColumnIfNotExists('inventory_batches', 'batch_number', 'TEXT');
+    addColumnIfNotExists('inventory_batches', 'invoice_number', 'TEXT');
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS inventory_transactions (
+        id TEXT PRIMARY KEY,
+        product_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        price REAL,
+        date TEXT NOT NULL,
+        batch_id TEXT,
+        FOREIGN KEY (product_id) REFERENCES products(id)
+      )
+    `);
+
+    // Required Products for Procurement Plan
+    db.run(`
+      CREATE TABLE IF NOT EXISTS required_products (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        price REAL,
+        quantity REAL NOT NULL,
+        unit TEXT NOT NULL, -- kg, litr, dona
+        brand TEXT,
+        category TEXT,
+        status TEXT DEFAULT 'PENDING', -- PENDING, ORDERED, RECEIVED
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Supply Orders
+    db.run(`
+      CREATE TABLE IF NOT EXISTS supply_orders (
+        id TEXT PRIMARY KEY,
+        order_id TEXT UNIQUE NOT NULL,
+        vendor TEXT NOT NULL,
+        amount REAL NOT NULL,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        items TEXT, -- JSON string
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id TEXT PRIMARY KEY,
+        first_name TEXT,
+        last_name TEXT,
+        brand TEXT,
+        name TEXT, -- Full name or brand display name
+        type TEXT,
+        score REAL,
+        phone TEXT,
+        contact_user TEXT,
+        telegram_link TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
   });
 }

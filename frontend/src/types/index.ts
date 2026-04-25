@@ -64,6 +64,14 @@ export interface LabSample {
   notes: string;
   created_by: string;
   timestamp: string;
+  test_results?: {
+    ph_level?: number;
+    bacterial_check?: 'PASS' | 'FAIL' | 'WARNING';
+    organoleptic_check?: 'PASS' | 'FAIL';
+    moisture_content?: number;
+    visual_inspection?: string;
+  };
+  storage_temp_history?: { time: string; temp: number }[];
   nutrition?: {
     vitamins: string;
     starch: string;

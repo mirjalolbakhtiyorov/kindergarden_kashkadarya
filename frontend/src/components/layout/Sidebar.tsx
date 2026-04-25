@@ -54,7 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeRole, onRoleChange }) => {
           </div>
           <div>
             <h1 className="text-brand-primary font-sans font-bold text-lg leading-tight uppercase tracking-tight">KinderFlow</h1>
-            <p className="text-brand-muted text-[10px] uppercase tracking-widest font-bold">Single OS</p>
+            <p className="text-brand-muted text-[10px] uppercase tracking-widest font-bold">Qashqadaryo MTM Tizimi</p>
           </div>
         </div>
       </div>

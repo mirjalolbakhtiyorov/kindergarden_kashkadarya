@@ -41,10 +41,35 @@ export const INITIAL_INVENTORY: InventoryProduct[] = [];
 export const INITIAL_TRANSACTIONS: Transaction[] = [];
 
 export const MOCK_CHECKLISTS: Record<InspectionType, string[]> = {
-  KITCHEN: [],
-  WAREHOUSE: [],
-  HYGIENE: [],
-  SAMPLE: []
+  KITCHEN: [
+    "Oziq-ovqat mahsulotlarini saqlash harorati me'yordami?",
+    "Pishirish jarayonida sanitariya-gigiyena qoidalariga rioya qilinyaptimi?",
+    "Tayyor taomlarning vizual ko'rinishi va hidi talablarga javob beradimi?",
+    "Oshxona jihozlari va idishlari tozalangan va dezinfeksiya qilinganmi?",
+    "Pishirish harorati va vaqti retseptura bo'yicha to'g'ri olib borilyaptimi?",
+    "Oshpazlarning maxsus kiyimi va shaxsiy gigiyenasi tekshirildimi?"
+  ],
+  WAREHOUSE: [
+    "Mahsulotlarning yaroqlilik muddati va qadoqlari butunligi tekshirildimi?",
+    "Omborxonada harorat va namlik ko'rsatkichlari jurnali yuritilyaptimi?",
+    "Xom-ashyolar turlari bo'yicha (go'sht, sut, quruq) alohida saqlanyaptimi?",
+    "Omborxona pol va devorlari toza, kemiruvchilarga qarshi chora ko'rilganmi?",
+    "Keltirilgan mahsulotlarning sifat sertifikatlari to'liq mavjudmi?"
+  ],
+  HYGIENE: [
+    "Xodimlar ish boshlashdan oldin tibbiy ko'rikdan o'tkazildimi?",
+    "Yuvinish xonalari sanitariya vositalari (sovun, sochiq) bilan ta'minlanganmi?",
+    "Bolalar ovqatlanish zallarida stol va stullar ovqatdan oldin va keyin tozalandimi?",
+    "Chiqindilarni yig'ish va utilizatsiya qilish tartibi to'g'ri yo'lga qo'yilganmi?",
+    "Xonalar muntazam ravishda shamollatilyaptimi va tozalash jadvallari bormi?"
+  ],
+  SAMPLE: [
+    "Kundalik tayyorlangan barcha taomlardan 48 soatlik sinama olinganmi?",
+    "Sinamalar maxsus steril idishlarda, yopiq holda saqlanyaptimi?",
+    "Sinama idishlarida taom nomi, tayyorlangan sana va vaqti yozilganmi?",
+    "Sinamalar saqlanadigan muzlatkich harorati muntazam tekshirib borilyaptimi?",
+    "Sinamalarni olish va utilizatsiya qilish maxsus jurnalda qayd etilyaptimi?"
+  ]
 };
 
 export const INITIAL_AUDITS: AuditRecord[] = [];

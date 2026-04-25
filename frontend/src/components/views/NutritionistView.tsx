@@ -12,7 +12,8 @@ import {
   Droplets,
   Clock,
   Camera,
-  Info
+  Info,
+  Users
 } from 'lucide-react';
 import axios from 'axios';
 import { useNotification } from '../../context/NotificationContext';
@@ -57,6 +58,12 @@ const NutritionistView: React.FC = () => {
 
   const [activeAgeGroup, setActiveAgeGroup] = useState<'1-3' | '3-7'>('3-7');
   const [activeDietType, setActiveDietType] = useState<'REGULAR' | 'DIETARY'>('REGULAR');
+
+  // Computed stats based on age group
+  const totalChildren = activeAgeGroup === '1-3' ? 45 : 82;
+  const dietChildren = activeAgeGroup === '1-3' ? 5 : 12;
+  const portionSize = activeAgeGroup === '1-3' ? '150-200g' : '250-300g';
+  const dietPortionSize = activeAgeGroup === '1-3' ? '150g' : '250g';
 
   const calendarDays = useMemo(() => {
     const days = [];
@@ -227,6 +234,39 @@ const NutritionistView: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Stats Summary Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-[2rem] p-6 border border-brand-border shadow-sm flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 text-brand-primary flex items-center justify-center">
+            <Users size={24} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Umumiy bolalar</p>
+            <p className="text-2xl font-black text-brand-depth">{totalChildren} <span className="text-sm font-bold text-brand-muted/70">ta ({dietChildren} ta parhezda)</span></p>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-[2rem] p-6 border border-brand-border shadow-sm flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+            <Utensils size={24} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Porsiya hajmi</p>
+            <p className="text-2xl font-black text-brand-depth">{portionSize}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-[2rem] p-6 border border-brand-border shadow-sm flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+            <Leaf size={24} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Parhez taom hajmi</p>
+            <p className="text-2xl font-black text-brand-depth">{dietPortionSize}</p>
+          </div>
+        </div>
+      </div>
 
       {/* Daily Menu Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

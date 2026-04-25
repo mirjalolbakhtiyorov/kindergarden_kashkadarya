@@ -11,7 +11,7 @@ export const staffFormSchema = z.object({
   education: z.string().min(2, "O'qish joyi kiritilishi shart"),
   experience_years: z.string().min(1, "Ish staji kiritilishi shart"),
   group_id: z.string().optional().or(z.literal('')),
-  status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
+  status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 
 export type StaffFormValues = z.infer<typeof staffFormSchema>;

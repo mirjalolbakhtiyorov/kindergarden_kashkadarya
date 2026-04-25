@@ -19,7 +19,7 @@ const LoginView: React.FC = () => {
     setLoading(true);
 
     try {
-      const endpoint = isParent ? 'http://127.0.0.1:3001/api/auth/parent-login' : 'http://127.0.0.1:3001/api/auth/login';
+      const endpoint = isParent ? 'http://localhost:3001/api/auth/parent-login' : 'http://localhost:3001/api/auth/login';
       const response = await axios.post(endpoint, { login: loginInput, password });
       
       login(response.data);
@@ -104,7 +104,7 @@ const LoginView: React.FC = () => {
         </form>
 
         <div className="text-center pt-4 border-t border-slate-50">
-           <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">Kashkadarya Region Kindergarten System</p>
+           <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">QASHQADARYO VILOYATI MAKTABGACHA TALIM TIZIMI</p>
         </div>
       </motion.div>
     </div>

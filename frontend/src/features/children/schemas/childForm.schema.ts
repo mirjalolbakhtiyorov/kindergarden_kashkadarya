@@ -5,7 +5,7 @@ export const childFormSchema = z.object({
   last_name: z.string().min(2, "Otasining ismi kiritilishi shart"),
   birth_date: z.string().min(1, "Tug'ilgan sana kiritilishi shart"),
   age_category: z.string().min(1, "Yosh kategoriyasi kiritilishi shart"),
-  gender: z.enum(["M", "F"], { errorMap: () => ({ message: "Jinsi tanlanishi shart" }) }),
+  gender: z.enum(["M", "F"], { message: "Jinsi tanlanishi shart" } as any),
   address: z.string().min(1, "Manzil kiritilishi shart"),
   weight: z.string().optional(),
   height: z.string().optional(),

@@ -17,6 +17,7 @@ import DirectorView from './components/views/DirectorView';
 import OperatorView from './components/views/OperatorView';
 import StorekeeperView from './components/views/StorekeeperView';
 import NutritionistView from './components/views/NutritionistView';
+import ChefView from './components/views/ChefView';
 import KitchenManagerView from './components/views/KitchenManagerView';
 import LabView from './components/views/LabView';
 import TeacherView from './components/views/TeacherView';
@@ -40,8 +41,6 @@ const App: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [currentRole, setCurrentRole] = useState<UserRole>('PARENT');
   const { groups } = useGroups();
-  const [kitchenTasks, setKitchenTasks] = useState<KitchenTask[]>(INITIAL_KITCHEN_TASKS);
-  const [samples, setSamples] = useState<LabSample[]>(INITIAL_LAB_SAMPLES);
 
   useEffect(() => {
     if (user) {
@@ -72,10 +71,11 @@ const App: React.FC = () => {
       case 'DIETITIAN':
         return <NutritionistView groups={groups} />;
       case 'KITCHEN_MANAGER':
+        return <KitchenManagerView />;
       case 'CHEF':
-        return <KitchenManagerView tasks={kitchenTasks} setTasks={setKitchenTasks} />;
+        return <ChefView />;
       case 'LAB_CONTROLLER':
-        return <LabView samples={samples} setSamples={setSamples} kitchenTasks={kitchenTasks} />;
+        return <LabView />;
       case 'TEACHER':
         return <TeacherView groups={groups} />;
       case 'NURSE':

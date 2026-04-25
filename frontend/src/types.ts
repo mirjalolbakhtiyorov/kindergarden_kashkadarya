@@ -164,6 +164,17 @@ export interface ChecklistItem {
   severity?: Severity;
 }
 
+export interface FinanceLog {
+  id: string;
+  date: string;
+  category: string;
+  item: string;
+  amount: number;
+  type: 'INCOME' | 'EXPENSE';
+}
+
+export type MenuItem = NavItem;
+
 export interface AuditRecord {
   inspection_id: string;
   inspection_type: InspectionType;

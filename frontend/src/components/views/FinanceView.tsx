@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Coins, 
   TrendingUp, 
@@ -18,6 +18,7 @@ import {
   Scale
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import axios from 'axios';
 import { 
   LineChart, 
   Line, 
@@ -33,11 +34,44 @@ import {
   Cell,
   Pie
 } from 'recharts';
+import { useNotification } from '../../context/NotificationContext';
+
+const API_BASE = 'http://localhost:3001/api';
 
 type FinanceTab = 'EXPENSES' | 'COST_PER_CHILD' | 'PURCHASE_VS_USAGE' | 'REPORTS';
 
 const FinanceView: React.FC = () => {
+  const { showNotification } = useNotification();
   const [activeTab, setActiveTab] = useState<FinanceTab>('EXPENSES');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE}/finance/transactions`);
+      setTransactions(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const stats = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayTotal = transactions.filter(t => t.date === today).reduce((sum, t) => sum + t.amount, 0);
+    const monthTotal = transactions.reduce((sum, t) => sum + t.amount, 0); // Simplified
+    return {
+      today: todayTotal,
+      month: monthTotal,
+      perChild: 18500 // Fallback
+    };
+  }, [transactions]);
 
   const tabs = [
     { id: 'EXPENSES', label: 'Xarajatlar', icon: Coins },
@@ -51,8 +85,8 @@ const FinanceView: React.FC = () => {
       {/* Header with KPI Cards */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Bugungi Xarajat', value: '1.2 mln', trend: '+5%', sub: 'so‘m', icon: ArrowUpRight, color: 'brand-primary' },
-          { label: 'Oylik Xarajat', value: '38.5 mln', trend: '-2%', sub: 'so‘m', icon: ArrowDownRight, color: 'blue-500' },
+          { label: 'Bugungi Xarajat', value: stats.today.toLocaleString(), trend: '+5%', sub: 'so‘m', icon: ArrowUpRight, color: 'brand-primary' },
+          { label: 'Oylik Xarajat', value: stats.month.toLocaleString(), trend: '-2%', sub: 'so‘m', icon: ArrowDownRight, color: 'blue-500' },
           { label: 'O‘rtacha sarf / bola', value: '18,500', trend: 'Stabil', sub: 'so‘m', icon: Users, color: 'emerald-500' },
           { label: 'Eng qimmat mahsulot', value: 'Go‘sht', trend: 'Mol', sub: '65,000 / kg', icon: BarChart3, color: 'violet-500' },
         ].map((kpi, idx) => (
@@ -104,7 +138,7 @@ const FinanceView: React.FC = () => {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
         >
-          {activeTab === 'EXPENSES' && <ExpensesSection />}
+          {activeTab === 'EXPENSES' && <ExpensesSection transactions={transactions} />}
           {activeTab === 'COST_PER_CHILD' && <CostPerChildSection />}
           {activeTab === 'PURCHASE_VS_USAGE' && <PurchaseVsUsageSection />}
           {activeTab === 'REPORTS' && <ReportsSection />}
@@ -116,14 +150,10 @@ const FinanceView: React.FC = () => {
 
 // --- View Sections ---
 
-const ExpensesSection = () => {
-  const data = [
-    { name: '01.04', food: 1200, nonFood: 300 },
-    { name: '05.04', food: 2100, nonFood: 450 },
-    { name: '10.04', food: 1800, nonFood: 200 },
-    { name: '15.04', food: 2500, nonFood: 600 },
-    { name: '18.04', food: 1900, nonFood: 150 },
-  ];
+const ExpensesSection = ({ transactions }: { transactions: any[] }) => {
+  const data = useMemo(() => {
+    return transactions.slice(0, 5).map(t => ({ name: t.date.slice(5), food: t.amount, nonFood: 0 }));
+  }, [transactions]);
 
   return (
     <div className="space-y-8">
@@ -139,6 +169,7 @@ const ExpensesSection = () => {
            </div>
         </div>
         <div className="h-[300px] w-full">
+          {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <AreaChart data={data}>
               <defs>
@@ -157,6 +188,9 @@ const ExpensesSection = () => {
               <Area type="monotone" dataKey="food" stroke="#4F46E5" fillOpacity={1} fill="url(#colorFood)" strokeWidth={3} />
             </AreaChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-brand-muted font-bold">Ma'lumot mavjud emas</div>
+          )}
         </div>
       </div>
 
@@ -194,24 +228,21 @@ const ExpensesSection = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {[
-                { date: '18.04.2024', cat: 'Oziq-ovqat', item: 'Mol go\'shti', amount: '25 kg', price: '65,000', total: '1,625,000' },
-                { date: '18.04.2024', cat: 'Oziq-ovqat', item: 'Sut 3.2%', amount: '120 l', price: '9,500', total: '1,140,000' },
-                { date: '17.04.2024', cat: 'Tozalik', item: 'Yuvish vositasi', amount: '15 dona', price: '12,000', total: '180,000' },
-                { date: '17.04.2024', cat: 'Oziq-ovqat', item: 'Guruch', amount: '50 kg', price: '18,000', total: '900,000' },
-                { date: '16.04.2024', cat: 'Kanselyariya', item: 'A4 qog\'oz', amount: '5 quti', price: '45,000', total: '225,000' },
-              ].map((row, idx) => (
+              {transactions.length === 0 && (
+                <tr><td colSpan={6} className="p-10 text-center text-brand-muted font-bold">Tranzaksiyalar topilmadi</td></tr>
+              )}
+              {transactions.map((row, idx) => (
                 <tr key={idx} className="hover:bg-brand-primary/[0.02] transition-colors group">
                   <td className="px-8 py-6 text-xs font-bold text-brand-slate uppercase tracking-tighter">{row.date}</td>
                   <td className="px-8 py-6">
                     <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                      row.cat === 'Oziq-ovqat' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-brand-muted'
-                    }`}>{row.cat}</span>
+                      row.category === 'Oziq-ovqat' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-brand-muted'
+                    }`}>{row.category}</span>
                   </td>
                   <td className="px-8 py-6 font-bold text-brand-depth text-sm">{row.item}</td>
-                  <td className="px-8 py-6 font-bold text-brand-depth text-sm italic">{row.amount}</td>
-                  <td className="px-8 py-6 font-mono text-xs font-black text-brand-slate">{row.price}</td>
-                  <td className="px-8 py-6 text-right font-black text-brand-primary text-sm">{row.total}</td>
+                  <td className="px-8 py-6 font-bold text-brand-depth text-sm italic">{row.quantity}</td>
+                  <td className="px-8 py-6 font-mono text-xs font-black text-brand-slate">{row.price_per_unit}</td>
+                  <td className="px-8 py-6 text-right font-black text-brand-primary text-sm">{row.amount.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
