@@ -160,7 +160,7 @@ app.get("/api/parent-portal/full-data/:childId", async (req, res) => {
       fetchAll('SELECT * FROM vaccinations WHERE child_id = ?', [childId]),
       fetchAll('SELECT * FROM progress_reports WHERE child_id = ? ORDER BY date DESC', [childId]),
       fetchAll('SELECT * FROM authorized_pickups WHERE child_id = ?', [childId]),
-      fetchAll('SELECT * FROM child_documents WHERE child_id = ?', [childId])
+      fetchAll('SELECT * FROM documents WHERE child_id = ?', [childId])
     ]);
 
     const child: any = await fetchOne('SELECT age_category, is_allergic FROM children WHERE id = ?', [childId]);
@@ -846,6 +846,180 @@ app.post("/api/supply/required-products", (req, res) => {
   `, [id, name, price, quantity, unit, brand, category], function(err) {
     if (err) res.status(500).json({ error: err.message });
     else res.json({ success: true, id });
+  });
+});
+
+// Messages System initialization
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sender_id TEXT NOT NULL,
+      receiver_id TEXT NOT NULL,
+      text TEXT NOT NULL,
+      sender_role TEXT NOT NULL,
+      status TEXT DEFAULT 'sent',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+});
+
+// Messaging API
+app.get("/api/messages", (req, res) => {
+  const { userId, contactId } = req.query;
+  if (!userId || !contactId) return res.status(400).json({ error: "Missing parameters" });
+
+  db.all(`
+    SELECT * FROM messages 
+    WHERE (sender_id = ? AND receiver_id = ?) 
+       OR (sender_id = ? AND receiver_id = ?)
+    ORDER BY created_at ASC
+  `, [userId, contactId, contactId, userId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    const formattedMessages = rows.map((m: any) => ({
+      id: m.id,
+      senderId: m.sender_id,
+      receiverId: m.receiver_id,
+      text: m.text,
+      time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: m.status,
+      type: m.sender_id === userId ? 'sent' : 'received',
+      senderRole: m.sender_role
+    }));
+    
+    res.json(formattedMessages);
+  });
+});
+
+app.post("/api/messages", (req, res) => {
+  const { senderId, receiverId, text, senderRole } = req.body;
+  
+  db.run(`
+    INSERT INTO messages (sender_id, receiver_id, text, sender_role)
+    VALUES (?, ?, ?, ?)
+  `, [senderId, receiverId, text, senderRole], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    const newMessage = {
+      id: this.lastID,
+      senderId,
+      receiverId,
+      text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sent',
+      senderRole
+    };
+    
+    res.json(newMessage);
+  });
+});
+
+app.get("/api/messages/contacts", (req, res) => {
+  const { parentId } = req.query;
+  if (!parentId) return res.status(400).json({ error: "Missing parentId" });
+
+  // 1. Find the teacher(s) for the child's group
+  db.all(`
+    SELECT 
+      u.id, 
+      u.full_name as name, 
+      'teacher' as role
+    FROM users u
+    JOIN staff s ON s.user_id = u.id
+    JOIN children c ON c.group_id = s.group_id
+    WHERE c.parent_account_id = ?
+    
+    UNION
+    
+    SELECT 
+      id, 
+      full_name as name, 
+      'admin' as role
+    FROM users
+    WHERE role = 'ADMIN' OR role = 'DIRECTOR'
+  `, [parentId], (err, baseContacts: any[]) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    if (baseContacts.length === 0) {
+      // Fallback if no specific teacher found
+      baseContacts = [
+        { id: 'admin_1', name: 'Bog\'cha Ma\'muriyati', role: 'admin' },
+        { id: 'teacher_1', name: 'Tarbiyachi', role: 'teacher' }
+      ];
+    }
+
+    // Count unread messages for each contact
+    db.all(`
+      SELECT sender_id, COUNT(*) as unread 
+      FROM messages 
+      WHERE receiver_id = ? AND status != 'read' 
+      GROUP BY sender_id
+    `, [parentId], (err, counts: any[]) => {
+      const updatedContacts = baseContacts.map(c => {
+        const countObj = counts?.find(cnt => cnt.sender_id === c.id);
+        return { 
+          ...c, 
+          unreadCount: countObj ? countObj.unread : 0,
+          isOnline: true // Simplified for now
+        };
+      });
+      res.json(updatedContacts);
+    });
+  });
+});
+
+app.put("/api/messages/read", (req, res) => {
+  const { userId, contactId } = req.body;
+  db.run(`
+    UPDATE messages SET status = 'read' 
+    WHERE sender_id = ? AND receiver_id = ? AND status != 'read'
+  `, [contactId, userId], (err) => {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true });
+  });
+});
+
+app.post("/api/messages/broadcast", (req, res) => {
+  const { senderId, receiverIds, text, senderRole } = req.body;
+  
+  if (!receiverIds || !Array.isArray(receiverIds) || receiverIds.length === 0) {
+    return res.status(400).json({ error: "No receivers specified" });
+  }
+
+  const placeholders = receiverIds.map(() => "(?, ?, ?, ?)").join(", ");
+  const values: any[] = [];
+  receiverIds.forEach(rid => {
+    values.push(senderId, rid, text, senderRole);
+  });
+
+  db.run(`
+    INSERT INTO messages (sender_id, receiver_id, text, sender_role)
+    VALUES ${placeholders}
+  `, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, count: receiverIds.length });
+  });
+});
+
+app.get("/api/messages/unread-counts", (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+  db.all(`
+    SELECT sender_id, COUNT(*) as unread 
+    FROM messages 
+    WHERE receiver_id = ? AND status != 'read' 
+    GROUP BY sender_id
+  `, [userId], (err, rows: any[]) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    const counts = rows.reduce((acc: any, row: any) => {
+      acc[row.sender_id] = row.unread;
+      return acc;
+    }, {});
+    
+    res.json(counts);
   });
 });
 

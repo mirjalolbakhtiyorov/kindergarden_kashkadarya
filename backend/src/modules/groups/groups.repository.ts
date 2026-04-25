@@ -11,7 +11,15 @@ export class GroupsRepository {
         try {
           const groupsWithChildren = await Promise.all(groups.map(async (group) => {
             const children = await new Promise((res, rej) => {
-              db.all("SELECT id, first_name, last_name, gender, status FROM children WHERE group_id = ?", [group.id], (err, rows) => {
+              db.all(`
+                SELECT 
+                  c.id, c.first_name, c.last_name, c.gender, c.status, c.parent_account_id,
+                  f.full_name as father_name, m.full_name as mother_name
+                FROM children c 
+                LEFT JOIN parents f ON c.father_id = f.id
+                LEFT JOIN parents m ON c.mother_id = m.id
+                WHERE c.group_id = ?
+              `, [group.id], (err, rows) => {
                 if (err) rej(err);
                 else res(rows);
               });
