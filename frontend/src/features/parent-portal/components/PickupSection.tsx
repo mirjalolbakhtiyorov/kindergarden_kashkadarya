@@ -9,7 +9,7 @@ const API_BASE = 'http://localhost:3001/api';
 
 const RELATIONS = [
   'Bobosi', 'Buvisi', 'Amakisi', 'Tog\'asi', 'Ammasi', 'Xolasi', 
-  'Akasi', 'Ukasi', 'Opasi', 'Singlisi', 'Otasi', 'Onasi'
+  'Akasi', 'Opasi', 'Otasi', 'Onasi'
 ];
 
 export const PickupSection = ({ data, onUpdate }: any) => {

@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   User, 
-  ShieldCheck, 
   MoreVertical, 
   Paperclip, 
-  Smile, 
   Send, 
   Check, 
   CheckCheck,
@@ -13,8 +11,7 @@ import {
   ArrowLeft,
   Mic,
   X,
-  Clock,
-  AlertCircle
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotification } from '../../../context/NotificationContext';
@@ -70,8 +67,7 @@ export const MessagesSection = () => {
       setContacts(data);
     } catch (error) {
       setContacts([
-        { id: 'teacher_1', name: 'Tarbiyachi (Guli opa)', role: 'teacher', unreadCount: 2, isOnline: true },
-        { id: 'admin_1', name: 'Bog\'cha Ma\'muriyati', role: 'admin', unreadCount: 0, isOnline: true }
+        { id: 'teacher_1', name: 'Tarbiyachi', role: 'teacher', unreadCount: 2, isOnline: true }
       ]);
     }
   }, [user?.id]);
@@ -87,18 +83,9 @@ export const MessagesSection = () => {
         loadContacts();
       }
     } catch (error) {
-      if (activeChat.role === 'teacher') {
-        setMessages([
-          { id: 1, senderId: activeChat.id, receiverId: user.id, text: 'Assalomu alaykum, Iskandar aka. Mustafoning bugungi mashg\'ulotlardagi ishtiroki juda yaxshi bo\'ldi.', time: '10:30', status: 'read', type: 'received', senderRole: 'teacher' },
-          { id: 2, senderId: user.id, receiverId: activeChat.id, text: 'Vaalaykum assalom, ustoz. Rahmat, xursandmiz. Bugun ingliz tilidan yangi so\'zlarni yodladimi?', time: '11:15', status: 'read', type: 'sent', senderRole: 'parent' },
-          { id: 3, senderId: activeChat.id, receiverId: user.id, text: 'Ha, mevalar mavzusini to\'liq o\'zlashtirdi. Hozirda rasm chizish darsida qatnashmoqda.', time: '11:20', status: 'read', type: 'received', senderRole: 'teacher' }
-        ]);
-      } else {
-        setMessages([
-          { id: 1, senderId: activeChat.id, receiverId: user.id, text: 'Hurmatli ota-onalar, 1-may kuni bog\'chamizda "Bahor bayrami" tadbiri bo\'lib o\'tadi.', time: '09:00', status: 'read', type: 'received', senderRole: 'admin' },
-          { id: 2, senderId: user.id, receiverId: activeChat.id, text: 'Tushunarli, rahmat. Tadbir soat nechada boshlanadi?', time: '09:45', status: 'read', type: 'sent', senderRole: 'parent' }
-        ]);
-      }
+      setMessages([
+        { id: 1, senderId: activeChat.id, receiverId: user.id, text: 'Assalomu alaykum, bugun mashg\'ulotlar juda qiziqarli o\'tdi.', time: '10:30', status: 'read', type: 'received', senderRole: 'teacher' }
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +135,7 @@ export const MessagesSection = () => {
                 >
                     <div className="relative">
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center bg-white border-2 border-brand-border text-brand-primary shrink-0">
-                        {contact.role === 'teacher' ? <User size={20} /> : <ShieldCheck size={20} />}
+                        <User size={20} />
                       </div>
                       {contact.unreadCount > 0 && (
                         <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white animate-bounce">
@@ -190,7 +177,7 @@ export const MessagesSection = () => {
                 <div className="flex items-center gap-3 md:gap-4">
                     <button onClick={() => setActiveChat(null)} className="md:hidden p-2 text-brand-muted hover:text-brand-primary"><ArrowLeft size={20} /></button>
                     <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-brand-primary/10 flex items-center justify-center text-brand-primary border border-brand-primary/20">
-                      {activeChat.role === 'teacher' ? <User size={20} md:size={28} /> : <ShieldCheck size={20} md:size={28} />}
+                      <User size={20} md:size={28} />
                     </div>
                     <div>
                       <h5 className="text-base md:text-xl font-black text-brand-depth tracking-tight">{activeChat.name}</h5>
@@ -212,7 +199,7 @@ export const MessagesSection = () => {
                 ) : (
                   <>
                     {messages.map((msg) => (
-                        <div key={msg.id} className={`flex ${msg.type === 'sent' ? 'justify-end' : 'justify-start'}`}>
+                        <div key={`msg-${msg.id}`} className={`flex ${msg.type === 'sent' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] md:max-w-[80%] p-4 md:p-5 rounded-2xl md:rounded-[2rem] shadow-lg relative group ${
                               msg.type === 'sent' ? 'bg-brand-primary text-white rounded-tr-none' : 'bg-slate-50 text-brand-depth rounded-tl-none border border-slate-100'
                           }`}>
@@ -235,7 +222,7 @@ export const MessagesSection = () => {
               <div className="px-4 md:px-8 pb-2 overflow-x-auto flex gap-2 no-scrollbar relative z-10">
                 {QUICK_TEMPLATES.map((tpl) => (
                   <button
-                    key={tpl.id}
+                    key={`tpl-${tpl.id}`}
                     onClick={() => handleSendMessage(tpl.text)}
                     className="whitespace-nowrap bg-slate-100 hover:bg-brand-primary/10 border border-slate-200 hover:border-brand-primary px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold text-brand-depth transition-all flex items-center gap-1.5 shadow-sm"
                   >

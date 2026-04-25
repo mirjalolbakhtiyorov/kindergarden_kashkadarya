@@ -106,9 +106,11 @@ function initDb() {
         carbohydrates REAL,
         vitamins TEXT,
         calories REAL,
+        image_url TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    addColumnIfNotExists('menus', 'image_url', 'TEXT');
 
     db.run(`
       CREATE TABLE IF NOT EXISTS messages (

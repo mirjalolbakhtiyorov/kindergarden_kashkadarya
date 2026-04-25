@@ -162,13 +162,13 @@ const ParentView = () => {
     switch (activeTab) {
       case 'profile': return <ProfileSection parentData={parentData} onUpdate={handleProfileUpdate} />;
       case 'finance': return <FinanceSection data={data} />;
-      case 'attendance': return <AttendanceSection data={data} />;
-      case 'menu': return <MenuSection data={data} />;
+      case 'attendance': return <AttendanceSection data={data} childId={user.childId} onUpdate={handleProfileUpdate} />;
+      case 'menu': return <MenuSection data={data} childId={user.childId} />;
       case 'medical': return <MedicalSection parentData={parentData} />;
       case 'vaccines': return <VaccineSection data={data} />;
       case 'progress': return <ProgressSection data={data} />;
       case 'messages': return <MessagesSection />;
-      case 'documents': return <DocumentsSection data={data} />;
+      case 'documents': return <DocumentsSection data={data} childId={user.childId} onUpdate={handleProfileUpdate} />;
       case 'pickup': return <PickupSection data={data} onUpdate={handleProfileUpdate} />;
       case 'security':
         return (

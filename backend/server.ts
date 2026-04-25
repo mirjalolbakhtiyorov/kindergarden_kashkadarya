@@ -10,6 +10,7 @@ import { StaffController } from "./src/modules/staff/staff.controller";
 import { HealthController } from "./src/modules/health/health.controller";
 import { OperationsRepository } from "./src/modules/operations/operations.repository";
 import crypto from "crypto";
+import multer from "multer";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,10 +20,38 @@ const PORT = 3001;
 
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Multer Configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage });
 
 // API routes
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "Backend is running" });
+});
+
+// Helper for logging operations
+const logOperation = (type: string, entity: string, name: string, desc: string) => {
+  const id = crypto.randomUUID();
+  db.run('INSERT INTO operations_log (id, operation_type, entity_type, entity_name, description) VALUES (?, ?, ?, ?, ?)',
+    [id, type, entity, name, desc]);
+};
+
+app.post("/api/upload", upload.single("image"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "Fayl yuklanmadi" });
+  const fileUrl = `http://localhost:3001/uploads/${req.file.filename}`;
+  logOperation('UPLOAD', 'FILE', req.file.filename, 'Yangi fayl yuklandi');
+  res.json({ url: fileUrl });
 });
 
 app.post("/api/auth/login", (req, res) => {
@@ -34,6 +63,7 @@ app.post("/api/auth/login", (req, res) => {
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
 
+    logOperation('LOGIN', 'USER', user.full_name, 'Tizimga kirildi (Xodim)');
     res.json({
       id: user.id,
       login: user.login,
@@ -52,6 +82,7 @@ app.post("/api/auth/parent-login", (req, res) => {
     const match = await bcrypt.compare(password, account.password_hash);
     if (!match) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
 
+    logOperation('LOGIN', 'PARENT', account.child_name || account.login, 'Tizimga kirildi (Ota-ona)');
     res.json({
       id: account.id,
       login: account.login,
@@ -83,13 +114,13 @@ app.get("/api/parent-portal/child-info/:childId", (req, res) => {
 
 app.put("/api/parent-portal/profile/:childId", async (req, res) => {
   const { childId } = req.params;
-  const { address, father, mother } = req.body;
+  const { address, photo_url, father, mother } = req.body;
 
   db.serialize(() => {
     db.run("BEGIN TRANSACTION");
 
-    // 1. Update child address
-    db.run('UPDATE children SET address = ? WHERE id = ?', [address, childId], function(err) {
+    // 1. Update child address and photo_url
+    db.run('UPDATE children SET address = ?, photo_url = ? WHERE id = ?', [address, photo_url, childId], function(err) {
       if (err) {
         db.run("ROLLBACK");
         return res.status(500).json({ error: err.message });
@@ -97,7 +128,7 @@ app.put("/api/parent-portal/profile/:childId", async (req, res) => {
     });
 
     // 2. Get father and mother IDs
-    db.get('SELECT father_id, mother_id FROM children WHERE id = ?', [childId], (err, child: any) => {
+    db.get('SELECT first_name, last_name, father_id, mother_id FROM children WHERE id = ?', [childId], (err, child: any) => {
       if (err || !child) {
         db.run("ROLLBACK");
         return res.status(500).json({ error: err?.message || "Bola topilmadi" });
@@ -123,7 +154,10 @@ app.put("/api/parent-portal/profile/:childId", async (req, res) => {
           
           db.run("COMMIT", (err) => {
             if (err) res.status(500).json({ error: err.message });
-            else res.json({ success: true });
+            else {
+              logOperation('UPDATE', 'PROFILE', `${child.first_name} ${child.last_name}`, 'Profil ma\'lumotlari yangilandi');
+              res.json({ success: true });
+            }
           });
         }
       );
@@ -185,6 +219,30 @@ app.get("/api/parent-portal/full-data/:childId", async (req, res) => {
   } catch (err: any) {
     console.error("DEBUG: Parent portal full-data critical error:", err);
     res.status(500).json({ error: "Ma'lumotlarni yig'ishda ichki xatolik" });
+  }
+});
+
+app.get("/api/parent-portal/menu/:childId/:date", async (req, res) => {
+  const { childId, date } = req.params;
+  
+  try {
+    const child: any = await new Promise((resolve) => {
+      db.get('SELECT age_category, is_allergic FROM children WHERE id = ?', [childId], (err, row) => {
+        resolve(row);
+      });
+    });
+
+    if (!child) return res.status(404).json({ error: "Bola topilmadi" });
+
+    const ageGroup = child.age_category?.includes('1-3') ? '1-3' : '3-7';
+    const dietType = child.is_allergic ? 'DIETARY' : 'REGULAR';
+
+    db.all('SELECT * FROM menus WHERE date = ? AND age_group = ? AND diet_type = ?', [date, ageGroup, dietType], (err, rows) => {
+      if (err) res.status(500).json({ error: err.message });
+      else res.json(rows);
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -346,6 +404,7 @@ app.put("/api/parents/:id", async (req, res) => {
           console.error("Update parent error:", err);
           return res.status(500).json({ error: err.message });
         }
+        logOperation('SECURITY', 'CREDENTIALS', login, 'Login/Parol yangilandi');
         res.json({ success: true });
       });
     } else {
@@ -354,6 +413,7 @@ app.put("/api/parents/:id", async (req, res) => {
           console.error("Update parent error:", err);
           return res.status(500).json({ error: err.message });
         }
+        logOperation('SECURITY', 'LOGIN_ONLY', login, 'Faqat login yangilandi');
         res.json({ success: true });
       });
     }
@@ -377,6 +437,7 @@ app.delete("/api/parents/:id", (req, res) => {
         console.error("Delete parent account error:", err);
         return res.status(500).json({ error: err.message });
       }
+      logOperation('DELETE', 'PARENT_ACCOUNT', id, 'Ota-ona hisobi o\'chirildi');
       res.json({ success: true });
     });
   });
@@ -396,8 +457,8 @@ app.get("/api/attendance/:groupId/:date", (req, res) => {
 });
 
 app.post("/api/attendance", (req, res) => {
-  const { date, group_name, attendance_data } = req.body;
-  const isoDate = new Date().toISOString().split('T')[0]; // Use ISO date format for DB consistency
+  const { date, group_name, attendance_data, reason } = req.body;
+  const isoDate = date || new Date().toISOString().split('T')[0];
 
   const childIds = Object.keys(attendance_data);
   let completed = 0;
@@ -408,16 +469,17 @@ app.post("/api/attendance", (req, res) => {
   childIds.forEach(childId => {
     const status = attendance_data[childId].toUpperCase();
     db.run(`
-      INSERT INTO attendance (id, child_id, date, status)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(child_id, date) DO UPDATE SET status = excluded.status
-    `, [crypto.randomUUID(), childId, isoDate, status], function(err) {
+      INSERT INTO attendance (id, child_id, date, status, reason)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(child_id, date) DO UPDATE SET status = excluded.status, reason = excluded.reason
+    `, [crypto.randomUUID(), childId, isoDate, status, reason || ''], function(err) {
       if (err && !hasError) {
         hasError = true;
         return res.status(500).json({ error: err.message });
       }
       completed++;
       if (completed === childIds.length && !hasError) {
+        logOperation('ATTENDANCE', 'SAVE', isoDate, `${childIds.length} ta bola uchun davomat/reja saqlandi`);
         res.json({ success: true });
       }
     });
@@ -440,7 +502,10 @@ app.post("/api/dishes", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `, [id, name, image, kcal, iron, carbs, vitamins], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('CREATE', 'DISH', name, 'Yangi taom qo\'shildi');
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -448,7 +513,10 @@ app.delete("/api/dishes/:id", (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM dishes WHERE id = ?', [id], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true });
+    else {
+      logOperation('DELETE', 'DISH', id, 'Taom o\'chirildi');
+      res.json({ success: true });
+    }
   });
 });
 
@@ -462,17 +530,18 @@ app.get("/api/menu/:date", (req, res) => {
 });
 
 app.post("/api/menu", (req, res) => {
-  const { date, meal_name, meal_type, nutrition, age_group, diet_type } = req.body;
+  const { date, meal_name, meal_type, nutrition, age_group, diet_type, image_url } = req.body;
   const id = crypto.randomUUID();
   db.run(`
-    INSERT INTO menus (id, date, meal_name, meal_type, age_group, diet_type, iron, carbohydrates, vitamins, calories)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO menus (id, date, meal_name, meal_type, age_group, diet_type, iron, carbohydrates, vitamins, calories, image_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(date, meal_type, age_group, diet_type) DO UPDATE SET
       meal_name = excluded.meal_name,
       iron = excluded.iron,
       carbohydrates = excluded.carbohydrates,
       vitamins = excluded.vitamins,
-      calories = excluded.calories
+      calories = excluded.calories,
+      image_url = excluded.image_url
   `, [
     id, date, meal_name, meal_type, 
     age_group || '3-7', 
@@ -480,10 +549,14 @@ app.post("/api/menu", (req, res) => {
     nutrition.iron || 0, 
     nutrition.carbs || 0, 
     nutrition.vitamins || '', 
-    nutrition.kcal || 0
+    nutrition.kcal || 0,
+    image_url || ''
   ], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('MENU', 'SAVE', `${date} ${meal_type}`, 'Taomnoma yangilandi');
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -517,7 +590,10 @@ app.post("/api/kitchen/tasks/:menuId/status", (req, res) => {
       served_time = COALESCE(excluded.served_time, served_time)
   `, [id, menuId, status, temperature, start_time, end_time, served_time], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true });
+    else {
+      logOperation('KITCHEN', 'TASK_UPDATE', menuId, `Oshxona vazifasi holati: ${status}`);
+      res.json({ success: true });
+    }
   });
 });
 
@@ -567,7 +643,10 @@ app.post("/api/inventory/products", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?)
   `, [id, name, category, unit, brand, min_stock || 0], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('INVENTORY', 'PRODUCT_CREATE', name, 'Yangi mahsulot omborga qo\'shildi');
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -579,7 +658,10 @@ app.put("/api/inventory/products/:id", (req, res) => {
     WHERE id = ?
   `, [name, category, unit, brand, min_stock, id], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true });
+    else {
+      logOperation('INVENTORY', 'PRODUCT_UPDATE', name, 'Mahsulot ma\'lumotlari yangilandi');
+      res.json({ success: true });
+    }
   });
 });
 
@@ -616,7 +698,10 @@ app.post("/api/inventory/stock-in", (req, res) => {
 
     db.run("COMMIT", (err) => {
       if (err) res.status(500).json({ error: err.message });
-      else res.json({ success: true, batchId });
+      else {
+        logOperation('INVENTORY', 'STOCK_IN', product_id, `${quantity} miqdorida mahsulot qabul qilindi`);
+        res.json({ success: true, batchId });
+      }
     });
   });
 });
@@ -665,7 +750,10 @@ app.post("/api/inventory/stock-out", (req, res) => {
       });
       db.run("COMMIT", (err) => {
         if (err) res.status(500).json({ error: err.message });
-        else res.json({ success: true });
+        else {
+          logOperation('INVENTORY', 'STOCK_OUT', product_id, `${quantity} miqdorida mahsulot chiqim qilindi`);
+          res.json({ success: true });
+        }
       });
     });
   });
@@ -708,7 +796,10 @@ app.post("/api/lab/samples", (req, res) => {
     JSON.stringify(storage_temp_history), JSON.stringify(nutrition), created_by
   ], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('LAB', 'SAMPLE_CREATE', dish_name, 'Laboratoriya namunasi olingandi');
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -757,7 +848,10 @@ app.post("/api/audits", (req, res) => {
 
     db.run("COMMIT", (err) => {
       if (err) res.status(500).json({ error: err.message });
-      else res.json({ success: true, id: audit_id });
+      else {
+        logOperation('AUDIT', 'SAVE', inspection_type, `Inspeksiya natijasi: ${overall_result}`);
+        res.json({ success: true, id: audit_id });
+      }
     });
   });
 });
@@ -778,7 +872,10 @@ app.post("/api/finance/transactions", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `, [id, date, category, item, amount, quantity, price_per_unit, type || 'EXPENSE'], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('FINANCE', type || 'EXPENSE', item, `${amount} so'mlik tranzaksiya`);
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -804,7 +901,10 @@ app.post("/api/supply/orders", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `, [id, order_id, vendor, amount, date, status, JSON.stringify(items)], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('SUPPLY', 'ORDER', vendor, `${amount} so'mlik buyurtma: ${status}`);
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -825,7 +925,10 @@ app.post("/api/suppliers", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [id, first_name, last_name, brand, name, type || 'Ta\'minotchi', score || 5.0, phone, contact_user, telegram_link], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('SUPPLY', 'VENDOR_CREATE', name, 'Yangi ta\'minotchi qo\'shildi');
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -845,7 +948,10 @@ app.post("/api/supply/required-products", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `, [id, name, price, quantity, unit, brand, category], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('SUPPLY', 'REQUEST', name, `Mahsulot so'rovi: ${quantity} ${unit}`);
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -911,6 +1017,7 @@ app.post("/api/messages", (req, res) => {
       senderRole
     };
     
+    logOperation('MESSAGE', 'SEND', senderId, `Xabar yuborildi: ${text.substring(0, 20)}...`);
     res.json(newMessage);
   });
 });
@@ -929,22 +1036,12 @@ app.get("/api/messages/contacts", (req, res) => {
     JOIN staff s ON s.user_id = u.id
     JOIN children c ON c.group_id = s.group_id
     WHERE c.parent_account_id = ?
-    
-    UNION
-    
-    SELECT 
-      id, 
-      full_name as name, 
-      'admin' as role
-    FROM users
-    WHERE role = 'ADMIN' OR role = 'DIRECTOR'
   `, [parentId], (err, baseContacts: any[]) => {
     if (err) return res.status(500).json({ error: err.message });
     
     if (baseContacts.length === 0) {
       // Fallback if no specific teacher found
       baseContacts = [
-        { id: 'admin_1', name: 'Bog\'cha Ma\'muriyati', role: 'admin' },
         { id: 'teacher_1', name: 'Tarbiyachi', role: 'teacher' }
       ];
     }
@@ -998,6 +1095,7 @@ app.post("/api/messages/broadcast", (req, res) => {
     VALUES ${placeholders}
   `, values, function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    logOperation('MESSAGE', 'BROADCAST', senderId, `Broadcast xabar yuborildi: ${receiverIds.length} ta foydalanuvchiga`);
     res.json({ success: true, count: receiverIds.length });
   });
 });
@@ -1032,7 +1130,10 @@ app.post("/api/parent-portal/pickups", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?)
   `, [id, child_id, full_name, relation, phone, photo_url], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id });
+    else {
+      logOperation('CREATE', 'PICKUP', full_name, `Yangi vakil qo'shildi (${relation})`);
+      res.json({ success: true, id });
+    }
   });
 });
 
@@ -1040,7 +1141,10 @@ app.delete("/api/parent-portal/pickups/:id", (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM authorized_pickups WHERE id = ?', [id], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true });
+    else {
+      logOperation('DELETE', 'PICKUP', id, 'Vakil o\'chirildi');
+      res.json({ success: true });
+    }
   });
 });
 
@@ -1086,7 +1190,10 @@ app.post("/api/parent-portal/documents", (req, res) => {
       
       db.run("COMMIT", (err) => {
         if (err) res.status(500).json({ error: err.message });
-        else res.json({ success: true, id });
+        else {
+          logOperation('CREATE', 'DOCUMENT', title, `Yangi hujjat yuklandi (${type})`);
+          res.json({ success: true, id });
+        }
       });
     });
   });
@@ -1096,7 +1203,10 @@ app.delete("/api/parent-portal/documents/:id", (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM documents WHERE id = ?', [id], function(err) {
     if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true });
+    else {
+      logOperation('DELETE', 'DOCUMENT', id, 'Hujjat o\'chirildi');
+      res.json({ success: true });
+    }
   });
 });
 

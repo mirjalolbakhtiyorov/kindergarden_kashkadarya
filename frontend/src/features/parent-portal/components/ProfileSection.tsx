@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, MapPin, Smartphone, Briefcase, Fingerprint, Target, Edit2, Save, X } from 'lucide-react';
+import { User, MapPin, Smartphone, Briefcase, Fingerprint, Target, Edit2, Save, X, Camera } from 'lucide-react';
 import { motion } from 'motion/react';
 import axios from 'axios';
 import { useNotification } from '../../../context/NotificationContext';
@@ -14,6 +14,7 @@ export const ProfileSection = ({ parentData, onUpdate }: any) => {
   // Local state for form data
   const [formData, setFormData] = useState({
     address: parentData.address || '',
+    photo_url: parentData.photo_url || '',
     father: {
       workplace: parentData.fatherWorkplace || '',
       phone: parentData.fatherPhone || '',
@@ -37,6 +38,27 @@ export const ProfileSection = ({ parentData, onUpdate }: any) => {
     } catch (err) {
       console.error(err);
       showNotification("Saqlashda xatolik yuz berdi", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('image', file);
+
+    try {
+      setLoading(true);
+      const res = await axios.post(`${API_BASE}/upload`, formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setFormData({ ...formData, photo_url: res.data.url });
+      showNotification("Rasm muvaffaqiyatli yuklandi!", "success");
+    } catch (err) {
+      showNotification("Rasmni yuklashda xatolik", "error");
     } finally {
       setLoading(false);
     }
@@ -83,6 +105,47 @@ export const ProfileSection = ({ parentData, onUpdate }: any) => {
             Bola Ma'lumotlari
           </h4>
           <div className="space-y-4 md:space-y-5">
+             {/* Child Photo Section */}
+             <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 mb-6">
+                <div className="relative group cursor-pointer" onClick={() => isEditing && document.getElementById('child-photo-upload')?.click()}>
+                   <div className="w-32 h-32 md:w-40 md:h-40 rounded-[2.5rem] md:rounded-[3rem] bg-white border-4 border-white shadow-xl overflow-hidden flex items-center justify-center relative">
+                      {formData.photo_url ? (
+                         <img src={formData.photo_url} alt="Bola rasmi" className="w-full h-full object-cover" />
+                      ) : (
+                         <User size={64} className="text-slate-200" />
+                      )}
+                      {loading && (
+                         <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                            <div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+                         </div>
+                      )}
+                   </div>
+                   {isEditing && (
+                      <div className="absolute inset-0 bg-brand-depth/40 flex items-center justify-center rounded-[2.5rem] md:rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Camera size={32} className="text-white" />
+                      </div>
+                   )}
+                </div>
+                {isEditing && (
+                   <div className="mt-4">
+                      <input 
+                         id="child-photo-upload"
+                         type="file"
+                         accept="image/*"
+                         onChange={handleFileChange}
+                         className="hidden"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => document.getElementById('child-photo-upload')?.click()}
+                        className="px-6 py-2 bg-white border border-brand-border rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+                      >
+                         <Camera size={14} /> Rasmni tanlash
+                      </button>
+                   </div>
+                )}
+             </div>
+
              <div className="bg-white p-5 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-brand-border shadow-sm group overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-4 md:p-6 opacity-[0.03]">
                    <User size={48} className="md:w-[60px] md:h-[60px]" />

@@ -18,7 +18,7 @@ export const ProgressSection = ({ data }: any) => (
         </div>
      </div>
      <div className="grid grid-cols-1 gap-6 md:gap-10">
-        {data?.progressReports?.length > 0 ? data.progressReports.map((r:any) => (
+        {data?.progress?.length > 0 ? data.progress.map((r:any) => (
            <div key={r.id} className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border border-brand-border shadow-sm hover:shadow-2xl transition-all">
               <div className="flex flex-col md:flex-row justify-between items-start gap-4 md:gap-10 mb-6">
                  <div className="flex items-center gap-4">
