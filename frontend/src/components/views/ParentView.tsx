@@ -169,7 +169,7 @@ const ParentView = () => {
       case 'progress': return <ProgressSection data={data} />;
       case 'messages': return <MessagesSection />;
       case 'documents': return <DocumentsSection data={data} />;
-      case 'pickup': return <PickupSection data={data} />;
+      case 'pickup': return <PickupSection data={data} onUpdate={handleProfileUpdate} />;
       case 'security':
         return (
           <SecuritySection 

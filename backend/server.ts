@@ -1023,6 +1023,83 @@ app.get("/api/messages/unread-counts", (req, res) => {
   });
 });
 
+app.post("/api/parent-portal/pickups", (req, res) => {
+  const { child_id, full_name, relation, phone, photo_url } = req.body;
+  const id = crypto.randomUUID();
+  
+  db.run(`
+    INSERT INTO authorized_pickups (id, child_id, full_name, relation, phone, photo_url)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, [id, child_id, full_name, relation, phone, photo_url], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true, id });
+  });
+});
+
+app.delete("/api/parent-portal/pickups/:id", (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM authorized_pickups WHERE id = ?', [id], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true });
+  });
+});
+
+app.post("/api/parent-portal/documents", (req, res) => {
+  const { child_id, title, type, file_url } = req.body;
+  const id = crypto.randomUUID();
+  
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    // 1. Insert document
+    db.run(`
+      INSERT INTO documents (id, child_id, title, type, file_url)
+      VALUES (?, ?, ?, ?, ?)
+    `, [id, child_id, title, type, file_url], function(err) {
+      if (err) {
+        db.run("ROLLBACK");
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // 2. Find teacher for this child to send automated message
+    db.get(`
+      SELECT s.user_id, c.first_name || ' ' || c.last_name as child_name
+      FROM children c
+      JOIN staff s ON s.group_id = c.group_id
+      WHERE c.id = ? AND s.position = 'tarbiyachi'
+      LIMIT 1
+    `, [child_id], (err, info: any) => {
+      if (info && info.user_id) {
+        const messageText = `Avtomatik bildirishnoma: ${info.child_name} uchun yangi hujjat yuklandi: "${title}" (${type})`;
+        
+        // Find parent account ID for sender
+        db.get("SELECT parent_account_id FROM children WHERE id = ?", [child_id], (err, child: any) => {
+           if (child && child.parent_account_id) {
+             db.run(`
+               INSERT INTO messages (sender_id, receiver_id, text, sender_role)
+               VALUES (?, ?, ?, 'parent')
+             `, [child.parent_account_id, info.user_id, messageText]);
+           }
+        });
+      }
+      
+      db.run("COMMIT", (err) => {
+        if (err) res.status(500).json({ error: err.message });
+        else res.json({ success: true, id });
+      });
+    });
+  });
+});
+
+app.delete("/api/parent-portal/documents/:id", (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM documents WHERE id = ?', [id], function(err) {
+    if (err) res.status(500).json({ error: err.message });
+    else res.json({ success: true });
+  });
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Backend API running on http://0.0.0.0:${PORT}`);
 });
